@@ -182,10 +182,11 @@ CREATE TABLE cercle.post_tags
 -- ************************************** cercle.img_vid_post
 CREATE TABLE cercle.img_vid_post
 (
+ id_img_vid_post SERIAL NOT NULL,
  id_post    int NOT NULL,
  id_media   int NOT NULL,
  lien_media varchar(255) NOT NULL,
- CONSTRAINT PK_IMG_VID_POST PRIMARY KEY ( id_post, id_media ),
+ CONSTRAINT PK_IMG_VID_POST PRIMARY KEY ( id_img_vid_post ),
  CONSTRAINT FK_IMG_VID_POST_ID_MEDIA FOREIGN KEY ( id_media ) REFERENCES cercle.type_media ( id_media ),
  CONSTRAINT FK_IMG_VID_POST_ID_POST FOREIGN KEY ( id_post ) REFERENCES cercle.post ( id_post )
 );
