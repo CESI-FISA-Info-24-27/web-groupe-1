@@ -1,0 +1,31 @@
+services:
+  # Base de données Cercle
+  cercle-db:
+    image: postgres:16.4
+    container_name: cercle-db
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "${HOST_PORT}:${POSTGRES_PORT}"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database:/docker-entrypoint-initdb.d
+    networks:
+      - cercle_network
+
+# Volumes pour la persistance
+volumes:
+  postgres_data:
+    driver: local
+
+# Réseau dédié
+networks:
+  cercle_network:
+    driver: bridge
