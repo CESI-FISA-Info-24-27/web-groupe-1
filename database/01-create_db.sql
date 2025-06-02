@@ -5,6 +5,10 @@
 CREATE SCHEMA IF NOT EXISTS cercle;
 
 
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pg_trgm";
+
+
 -- ************************************** cercle.roles
 CREATE TABLE cercle.roles
 (
@@ -79,8 +83,8 @@ CREATE TABLE cercle.users
  updated_at   timestamp NOT NULL,
  CONSTRAINT PK_USERS PRIMARY KEY ( id_user ),
  CONSTRAINT FK_USERS_ID_ROLE FOREIGN KEY ( id_role ) REFERENCES cercle.roles ( id_role ),
- ADD CONSTRAINT unique_username UNIQUE (username),
- ADD CONSTRAINT unique_email UNIQUE (mail)
+ CONSTRAINT unique_username UNIQUE (username),
+ CONSTRAINT unique_email UNIQUE (mail)
 );
 
 
