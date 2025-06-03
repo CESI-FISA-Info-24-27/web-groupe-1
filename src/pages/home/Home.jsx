@@ -17,7 +17,7 @@ const Home = () => {
           {/* Navigation */}
           <nav className="landing-nav-menu">
             <Link to="/" className="nav-link active">Home</Link>
-            <Link to="/publicfeed" className="nav-link">Feed</Link>
+            <Link to="/feed" className="nav-link">Feed</Link>
             <Link to="/about" className="nav-link">About Us</Link>
           </nav>
 

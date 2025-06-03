@@ -18,6 +18,26 @@ const Register = () => {
 
         {/* Formulaire */}
         <form className="auth-form">
+          <div className="form-row">
+            <div className="form-group">
+              <label>Prénom</label>
+              <input 
+                type="text" 
+                className="form-input"
+                placeholder="Votre prénom"
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Nom</label>
+              <input 
+                type="text" 
+                className="form-input"
+                placeholder="Votre nom"
+              />
+            </div>
+          </div>
+
           <div className="form-group">
             <label>Nom d'utilisateur</label>
             <input 
@@ -68,8 +88,8 @@ const Register = () => {
       {/* Partie droite - Image */}
       <div className="auth-image-section">
         <img 
-          src="https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80" 
-          alt="Couple heureux"
+          src="https://images.unsplash.com/photo-1737845079400-1d04c3f2ab5d?q=80&w=1950&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D" 
+          alt="Portrait femme"
           className="auth-image"
         />
       </div>
