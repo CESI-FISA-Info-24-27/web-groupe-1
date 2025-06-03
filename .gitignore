@@ -1,5 +1,5 @@
 # =================================================================
-# .gitignore complet pour Cercle (React + Node.js + PostgreSQL + Docker)
+# .gitignore pour Social Network API (Node.js + PostgreSQL + Docker)
 # =================================================================
 
 # =================================================================
@@ -7,13 +7,27 @@
 # =================================================================
 .env
 .env.*
+!.env.example
 !.env.template
 *.key
 *.pem
 *.p12
 *.pfx
+*.crt
+*.csr
 secrets.json
 config/production.json
+config/local.json
+
+# JWT secrets
+jwt-secret.txt
+refresh-secret.txt
+
+# SSH keys
+id_rsa
+id_rsa.pub
+id_ed25519
+id_ed25519.pub
 
 # =================================================================
 # Node.js & NPM
@@ -23,6 +37,10 @@ node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Package lock files (gardez seulement celui que vous utilisez)
 package-lock.json
 yarn.lock
 pnpm-lock.yaml
@@ -33,58 +51,154 @@ pids
 *.seed
 *.pid.lock
 
-# Coverage directory used by tools like istanbul
-coverage/
-*.lcov
-
-# nyc test coverage
-.nyc_output
-
-# Grunt intermediate storage
-.grunt
-
-# Bower dependency directory
-bower_components
-
-# node-waf configuration
-.lock-wscript
-
-# Optional npm cache directory
+# Cache
 .npm
-
-# Optional eslint cache
-.eslintcache
-
-# Optional REPL history
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+.pnp.*
 .node_repl_history
+
+# Optional caches
+.eslintcache
+.stylelintcache
 
 # Output of 'npm pack'
 *.tgz
 
-# Yarn Integrity file
-.yarn-integrity
+# =================================================================
+# Base de données & Prisma
+# =================================================================
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Prisma
+prisma/dev.db
+prisma/test.db
+prisma/migrations/**/migration.sql
+
+# PostgreSQL data & dumps
+postgresql/
+pg_data/
+postgres_data/
+pgadmin_data/
+pgadmin/
+*.sql.backup
+*.dump
+*.backup
+backup*.sql
+dump*.sql
+*.backup.sql
 
 # =================================================================
-# React & Frontend
+# Logs & Monitoring
 # =================================================================
-# Production builds
+# Application logs
+logs/
+*.log
+.pm2/
+
+# New Relic
+newrelic.js
+newrelic_agent.log
+
+# Sentry
+.sentryclirc
+
+# =================================================================
+# Docker & Containers
+# =================================================================
+# Docker volumes et données
+docker-data/
+volumes/
+
+# Docker Compose override
+docker-compose.override.yml
+docker-compose.local.yml
+.docker/
+
+# =================================================================
+# Uploads & Media & Temporary
+# =================================================================
+# User uploads
+uploads/*
+!uploads/.gitkeep
+public/uploads/
+static/uploads/
+media/
+public/media/
+storage/
+files/
+attachments/
+
+# Temporary files
+tmp/
+temp/
+.tmp/
+
+# =================================================================
+# Build & Compilation
+# =================================================================
+# Build outputs
 build/
 dist/
 out/
+build/Release
 
-# Static files
-public/uploads/
-public/temp/
+# TypeScript
+*.tsbuildinfo
+tsconfig.tsbuildinfo
 
-# Cache directories
+# Webpack & bundlers
+.webpack/
 .cache/
 .parcel-cache/
 
-# Bundle analyzer report
+# React/Frontend specific
+storybook-static/
+.storybook-out
 bundle-report.html
 
-# Storybook build outputs
-storybook-static/
+# Next.js
+.next/
+
+# Nuxt.js
+.nuxt/
+
+# Gatsby
+.cache/
+public
+
+# SvelteKit
+.svelte-kit
+
+# Vite
+.vite/
+
+# =================================================================
+# Testing
+# =================================================================
+# Coverage
+coverage/
+*.lcov
+.nyc_output
+jest-coverage/
+
+# Test results
+test-results/
+junit.xml
+
+# Cypress
+cypress/videos/
+cypress/screenshots/
+cypress/downloads/
+
+# Playwright
+playwright-report/
+playwright/.cache/
 
 # =================================================================
 # Development & IDE
@@ -117,120 +231,20 @@ storybook-static/
 /.emacs.desktop
 /.emacs.desktop.lock
 *.elc
-
-# =================================================================
-# Docker & Containers
-# =================================================================
-# Docker volumes et données persistantes
-postgres_data/
-pgadmin_data/
-docker-data/
-volumes/
-
-# Docker logs
-*.log
-logs/
-
-# Docker Compose override
-docker-compose.override.yml
-docker-compose.local.yml
-
-# =================================================================
-# Base de données PostgreSQL
-# =================================================================
-# Dumps SQL
-*.sql.backup
-*.dump
-*.backup
-backup*.sql
-dump*.sql
-
-# PostgreSQL data
-postgresql/
-pg_data/
-
-# pgAdmin
-pgadmin/
-
-# =================================================================
-# Logs & Monitoring
-# =================================================================
-# Application logs
-logs/
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# PM2 logs
-.pm2/
-
-# =================================================================
-# Uploads & Media
-# =================================================================
-# User uploads
-uploads/
-public/uploads/
-static/uploads/
-media/
-public/media/
-storage/
-
-# Temporary files
-tmp/
-temp/
-.tmp/
-
-# =================================================================
-# Build & Compilation
-# =================================================================
-# TypeScript
-*.tsbuildinfo
-
-# Babel
-.babel-cache/
-
-# Webpack
-.webpack/
-
-# Next.js
-.next/
-out/
-
-# Nuxt.js
-.nuxt/
-dist/
-
-# Vite
-dist/
-.vite/
-
-# =================================================================
-# Testing
-# =================================================================
-# Jest
-coverage/
-.jest/
-
-# Cypress
-cypress/videos/
-cypress/screenshots/
-cypress/downloads/
-
-# Playwright
-test-results/
-playwright-report/
-playwright/.cache/
+auto-save-list
+tramp
+.\#*
 
 # =================================================================
 # OS & System Files
 # =================================================================
 # macOS
 .DS_Store
+.DS_Store?
+._*
 .AppleDouble
 .LSOverride
 Icon?
-._*
 .Spotlight-V100
 .Trashes
 
@@ -241,12 +255,12 @@ Desktop.ini
 $RECYCLE.BIN/
 *.cab
 *.msi
+*.msix
 *.msm
 *.msp
 *.lnk
 
 # Linux
-*~
 .fuse_hidden*
 .directory
 .Trash-*
@@ -255,35 +269,24 @@ $RECYCLE.BIN/
 # =================================================================
 # Déploiement & Production
 # =================================================================
-# Terraform
+# Cloud platforms
+.vercel
+.netlify
+.railway
+
+# Process managers
+ecosystem.config.js
+
+# Serverless
+.serverless/
+
+# Infrastructure as Code
 *.tfstate
 *.tfstate.*
 .terraform/
 .terraform.lock.hcl
-
-# Kubernetes
 *.kubeconfig
-
-# Ansible
 *.retry
-
-# =================================================================
-# Certificats & SSL
-# =================================================================
-# SSL certificates
-*.crt
-*.pem
-*.key
-*.p12
-*.pfx
-ssl/
-certs/
-
-# =================================================================
-# Monitoring & Analytics
-# =================================================================
-# Sentry
-.sentryclirc
 
 # =================================================================
 # Archives & Backups
@@ -292,25 +295,56 @@ certs/
 *.tar.gz
 *.rar
 *.7z
+*.bak
+*.backup
+*.old
+*.orig
+backup/
+backups/
 backup-*
 *-backup.*
 
 # =================================================================
-# Documentation générée
+# Documentation & Reports
 # =================================================================
+# Generated documentation
 docs/build/
+docs/_build/
 doc/build/
+api-docs/
+
+# Performance monitoring
+lighthouse-reports/
+performance/
 
 # =================================================================
-# Fichiers temporaires spécifiques au projet
+# Project Specific
 # =================================================================
-# Fichiers de migration temporaires
-migrations/temp/
+# Custom scripts avec données sensibles
+scripts/production/
+scripts/deploy/
 
-# Fichiers de test locaux
+# Local development helpers
+dev-helpers/
+local-scripts/
 test-data/
 mock-data/
 
-# Scripts de développement locaux
-scripts/local/
-dev-scripts/
+# Custom logs
+app-logs/
+error-logs/
+access-logs/
+
+# Migrations temporaires
+migrations/temp/
+
+# Miscellaneous cache
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
+
+# Grunt
+.grunt
+bower_components
+lib-cov
