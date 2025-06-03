@@ -6,6 +6,7 @@ import Messages from './pages/messages/Messages' // Page Messages
 import Profil from './pages/profil/Profil' // Page Profil
 import Login from './pages/auth/Login'
 import Register from './pages/auth/Register'
+import AboutUs from './pages/about/AboutUs' // Nouvelle page About Us
 
 function App() {
   return (
@@ -13,6 +14,9 @@ function App() {
       <Routes>
         {/* Page d'accueil (landing) */}
         <Route path="/" element={<Home />} />
+        
+        {/* Page About Us (sans layout) */}
+        <Route path="/about" element={<AboutUs />} />
         
         {/* Pages d'authentification (sans layout) */}
         <Route path="/login" element={<Login />} />
