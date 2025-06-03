@@ -1,14 +1,19 @@
-import Header from './Header'
-import Footer from './Footer'
+import Sidebar from './Sidebar'
+import RightSidebar from './RightSidebar'
 
 const Layout = ({ children }) => {
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      <Header />
-      <main className="flex-1 container mx-auto px-4 py-8 max-w-4xl">
+    <div className="app-layout">
+      {/* Sidebar gauche */}
+      <Sidebar />
+      
+      {/* Contenu principal */}
+      <main className="main-content">
         {children}
       </main>
-      <Footer />
+      
+      {/* Sidebar droite */}
+      <RightSidebar />
     </div>
   )
 }
