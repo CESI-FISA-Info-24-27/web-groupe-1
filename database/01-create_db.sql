@@ -81,6 +81,7 @@ CREATE TABLE cercle.users
  is_active    bool NOT NULL,
  created_at   timestamp NOT NULL,
  updated_at   timestamp NOT NULL,
+ last_login   timestamp NULL,
  CONSTRAINT PK_USERS PRIMARY KEY ( id_user ),
  CONSTRAINT FK_USERS_ID_ROLE FOREIGN KEY ( id_role ) REFERENCES cercle.roles ( id_role ),
  CONSTRAINT unique_username UNIQUE (username),
@@ -254,6 +255,8 @@ CREATE INDEX idx_post_content_search ON cercle.post
     USING gin(to_tsvector('french', content)) WHERE active = true;
 
 CREATE INDEX idx_post_tags_tag ON cercle.post_tags(id_tag);
+
+CREATE INDEX idx_users_last_login ON cercle.users(last_login DESC);
 
 
 GRANT USAGE ON SCHEMA cercle TO postgres;
