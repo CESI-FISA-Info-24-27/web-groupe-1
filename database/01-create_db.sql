@@ -193,6 +193,18 @@ CREATE TABLE cercle.img_vid_post
 );
 
 
+-- ************************************** cercle.img_vid_post
+CREATE TABLE cercle.img_vid_msg
+(
+ id_img_vid_msg SERIAL NOT NULL,
+ id_message    int NOT NULL,
+ id_media   int NOT NULL,
+ lien_media varchar(255) NOT NULL,
+ CONSTRAINT PK_IMG_VID_MSG PRIMARY KEY ( id_img_vid_msg ),
+ CONSTRAINT FK_IMG_VID_MSG_ID_MEDIA FOREIGN KEY ( id_media ) REFERENCES cercle.type_media ( id_media ),
+ CONSTRAINT FK_IMG_VID_MSG_ID_MSG FOREIGN KEY ( id_message ) REFERENCES cercle.messages_prives ( id_message )
+);
+
 
 -- ************************************** cercle.likes
 CREATE TABLE cercle.likes
