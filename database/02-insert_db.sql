@@ -4,9 +4,9 @@
 
 
 INSERT INTO cercle.roles (role) VALUES 
-('user'),           -- id_role = 1 - Utilisateur standard
-('moderator'),      -- id_role = 2 - Modérateur
-('administrator');  -- id_role = 3 - Administrateur
+('USER'),           -- id_role = 1 - Utilisateur standard
+('MODERATOR'),      -- id_role = 2 - Modérateur
+('ADMIN');  -- id_role = 3 - Administrateur
 
 
 INSERT INTO cercle.langues (langue) VALUES 
