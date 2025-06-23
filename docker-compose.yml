@@ -74,6 +74,64 @@ services:
       "
     restart: "no"
 
+  # API Backend (Mode développement avec npm run dev)
+  cercle-api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: development
+    container_name: cercle-api
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-cercle_user}:${POSTGRES_PASSWORD:-cercle_password}@cercle-db:5432/${POSTGRES_DB:-cercle_db}
+      - JWT_SECRET=${JWT_SECRET:-dev-jwt-secret}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET:-dev-refresh-secret}
+      - FRONTEND_URL=http://localhost:${FRONTEND_PORT:-5173}
+      - MINIO_ENDPOINT=minio
+      - MINIO_PORT=9000
+      - MINIO_ACCESS_KEY=${MINIO_ROOT_USER:-minioadmin}
+      - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD:-minioadmin123}
+      - MINIO_USE_SSL=false
+    ports:
+      - "${API_PORT:-3001}:3000"
+    depends_on:
+      cercle-db:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    volumes:
+      # Montage du code source pour hot reload
+      - ./backend:/app
+      - /app/node_modules  # Volume anonyme pour node_modules
+      - ./backend/uploads:/app/uploads
+      - ./backend/logs:/app/logs
+    networks:
+      - cercle_network
+    command: ["npm", "run", "dev"]
+    restart: unless-stopped
+
+  # Frontend (Mode développement avec npm run dev)
+  cercle-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: cercle-frontend
+    environment:
+      - NODE_ENV=development
+      - VITE_API_BASE_URL=http://localhost:${API_PORT:-3001}
+    ports:
+      - "${FRONTEND_PORT:-5173}:5173"
+    depends_on:
+      - cercle-api
+    volumes:
+      # Montage du code source pour hot reload
+      - ./frontend:/app
+      - /app/node_modules  # Volume anonyme pour node_modules
+    networks:
+      - cercle_network
+    command: ["npm", "run", "dev"]
+    restart: unless-stopped
+
 # Volumes pour la persistance
 volumes:
   postgres_data:
