@@ -1,11 +1,15 @@
-// src/services/api.js - Version améliorée avec refresh automatique des tokens
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+// frontend/src/services/api.js - Version Docker avec gestion complète des tokens
+// 🔄 Adaptation pour Docker tout en conservant les fonctionnalités avancées
 
 class ApiService {
   constructor() {
-    this.baseURL = API_BASE_URL;
+    // ✅ ADAPTATION DOCKER : Utiliser le proxy Vite au lieu de l'URL directe
+    this.baseURL = ''; // Le proxy Vite redirigera /api/* vers backend:3000/api/*
     this.isRefreshing = false;
     this.failedQueue = [];
+    
+    console.log('🔗 API Service initialized for Docker (using Vite proxy)');
+    console.log('🔧 Token refresh system enabled');
   }
 
   /**
@@ -36,6 +40,7 @@ class ApiService {
     try {
       console.log('🔄 Refreshing token...');
       
+      // ✅ ADAPTATION DOCKER : Utiliser le proxy Vite
       const response = await fetch(`${this.baseURL}/api/v1/auth/refresh`, {
         method: 'POST',
         headers: {
@@ -77,7 +82,10 @@ class ApiService {
    * Requête principale avec gestion automatique du refresh
    */
   async request(endpoint, options = {}) {
+    // ✅ ADAPTATION DOCKER : Le proxy Vite redirigera automatiquement
     const url = `${this.baseURL}${endpoint}`;
+    
+    console.log('🚀 Making request to:', url, '(via Vite proxy)');
     
     const config = {
       headers: {
@@ -91,10 +99,19 @@ class ApiService {
     const token = localStorage.getItem('accessToken');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+      console.log('🔐 Adding auth token to request');
     }
 
     try {
+      console.log('📤 Request config:', { 
+        method: config.method || 'GET', 
+        url, 
+        headers: Object.keys(config.headers) 
+      });
+
       let response = await fetch(url, config);
+      
+      console.log('📥 Response:', response.status, response.statusText);
       
       // ✅ GESTION AUTOMATIQUE DU REFRESH TOKEN
       if (response.status === 401) {
@@ -124,12 +141,14 @@ class ApiService {
           config.headers.Authorization = `Bearer ${newToken}`;
           
           // Refaire la requête originale
+          console.log('🔄 Retrying request with new token...');
           response = await fetch(url, config);
           
           // Traiter la file d'attente avec le nouveau token
           this.processQueue(null, newToken);
           
         } catch (refreshError) {
+          console.error('❌ Token refresh failed:', refreshError);
           this.processQueue(refreshError, null);
           throw refreshError;
         } finally {
@@ -140,14 +159,24 @@ class ApiService {
       // Gérer les autres erreurs HTTP
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
+        console.error('❌ HTTP Error:', response.status, errorData);
         throw new Error(errorData.message || `HTTP Error: ${response.status}`);
       }
 
       // Retourner les données JSON
-      return await response.json();
+      const data = await response.json();
+      console.log('✅ Response data received');
+      return data;
       
     } catch (error) {
-      console.error('API Request failed:', error);
+      console.error('💥 API Request failed:', error);
+      
+      // ✅ ADAPTATION DOCKER : Messages d'erreur spécifiques
+      if (error.name === 'TypeError' && error.message.includes('fetch')) {
+        console.error('🌐 Network error - backend service may be unavailable');
+        console.error('💡 Check if backend container is running: docker logs cercle-backend');
+      }
+      
       throw error;
     }
   }
@@ -203,12 +232,57 @@ class ApiService {
   async refreshTokenIfNeeded() {
     if (this.isTokenNearExpiry() && !this.isRefreshing) {
       try {
+        console.log('⏰ Token near expiry, refreshing preemptively...');
         await this.refreshToken();
       } catch (error) {
-        console.warn('Preemptive token refresh failed:', error);
+        console.warn('⚠️ Preemptive token refresh failed:', error);
       }
     }
   }
+
+  /**
+   * ✅ NOUVEAU : Test de connectivité via proxy
+   */
+  async testConnection() {
+    try {
+      console.log('🧪 Testing API connection via Docker proxy...');
+      const response = await this.get('/health');
+      console.log('✅ API connection test successful:', response);
+      return true;
+    } catch (error) {
+      console.error('❌ API connection test failed:', error);
+      console.error('💡 Check: docker logs cercle-backend && docker logs cercle-frontend');
+      return false;
+    }
+  }
+
+  /**
+   * ✅ NOUVEAU : Informations de debug pour Docker
+   */
+  getDebugInfo() {
+    return {
+      baseURL: this.baseURL,
+      hasAccessToken: !!localStorage.getItem('accessToken'),
+      hasRefreshToken: !!localStorage.getItem('refreshToken'),
+      isRefreshing: this.isRefreshing,
+      failedQueueLength: this.failedQueue.length,
+      tokenNearExpiry: this.isTokenNearExpiry(),
+      environment: 'docker'
+    };
+  }
 }
 
-export default new ApiService();
+const apiService = new ApiService();
+
+// ✅ ADAPTATION DOCKER : Test de connectivité retardé pour laisser Vite se préparer
+setTimeout(() => {
+  apiService.testConnection();
+  console.log('🔍 API Debug Info:', apiService.getDebugInfo());
+}, 3000);
+
+// ✅ ADAPTATION DOCKER : Refresh préventif automatique toutes les 5 minutes
+setInterval(() => {
+  apiService.refreshTokenIfNeeded();
+}, 5 * 60 * 1000);
+
+export default apiService;
