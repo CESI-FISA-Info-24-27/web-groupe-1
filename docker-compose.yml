@@ -96,8 +96,7 @@ services:
       - ./backend:/app
       - /app/node_modules
     restart: unless-stopped
-    # Commande pour faire les migrations après démarrage
-    entrypoint: ["sh", "-c", "sleep 15 && npx prisma generate && npx prisma migrate dev --name init && npm run dev"]
+    entrypoint: ["sh", "-c", "sleep 15 && npx prisma generate && npm run dev"]
     networks:
       - cercle_network
 
@@ -109,7 +108,7 @@ services:
     container_name: cercle-frontend
     environment:
       - NODE_ENV=development
-      - VITE_API_BASE_URL=http://localhost:3000
+      - VITE_API_BASE_URL=http://backend:3000
     ports:
       - "5173:5173"
     depends_on:

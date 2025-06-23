@@ -11,7 +11,6 @@
     "test:coverage": "jest --coverage",
     "db:migrate": "npx prisma migrate dev",
     "db:deploy": "npx prisma migrate deploy",
-    "db:seed": "node prisma/seeds/seed.js",
     "db:studio": "npx prisma studio",
     "db:generate": "npx prisma generate",
     "db:reset": "npx prisma migrate reset",
@@ -82,9 +81,6 @@
     "prettier": "^3.1.1",
     "prisma": "^5.7.1",
     "supertest": "^6.3.3"
-  },
-  "prisma": {
-    "seed": "node prisma/seeds/seed.js"
   },
   "nodemonConfig": {
     "ignore": [

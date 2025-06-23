@@ -1,13 +1,17 @@
-// src/services/api.js
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
-
+// frontend/src/services/api.js - Version Docker
+// Utilise le proxy Vite, donc pas besoin de spécifier l'URL complète
 class ApiService {
   constructor() {
-    this.baseURL = API_BASE_URL;
+    // En Docker, on utilise le proxy Vite qui redirige vers backend:3000
+    this.baseURL = ''; // Utilise le proxy Vite
+    console.log('🔗 API Service initialized for Docker (using Vite proxy)');
   }
 
   async request(endpoint, options = {}) {
+    // Le proxy Vite redirigera /api/* vers backend:3000/api/*
     const url = `${this.baseURL}${endpoint}`;
+    
+    console.log('🚀 Making request to:', url);
     
     const config = {
       headers: {
@@ -21,26 +25,56 @@ class ApiService {
     const token = localStorage.getItem('accessToken');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+      console.log('🔐 Adding auth token to request');
     }
 
     try {
+      console.log('📤 Request config:', { 
+        method: config.method || 'GET', 
+        url, 
+        headers: Object.keys(config.headers) 
+      });
+      
       const response = await fetch(url, config);
+      
+      console.log('📥 Response:', response.status, response.statusText);
       
       // Gérer les erreurs HTTP
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
+        console.error('❌ HTTP Error:', response.status, errorData);
         throw new Error(errorData.message || `HTTP Error: ${response.status}`);
       }
 
       // Retourner les données JSON
-      return await response.json();
+      const data = await response.json();
+      console.log('✅ Response data received');
+      return data;
     } catch (error) {
-      console.error('API Request failed:', error);
+      console.error('💥 API Request failed:', error);
+      
+      if (error.name === 'TypeError' && error.message.includes('fetch')) {
+        console.error('🌐 Network error - backend service may be unavailable');
+      }
+      
       throw error;
     }
   }
 
-  // Méthodes HTTP raccourcies
+  // Test de connectivité via proxy
+  async testConnection() {
+    try {
+      console.log('🧪 Testing API connection via proxy...');
+      const response = await this.get('/health');
+      console.log('✅ API connection test successful:', response);
+      return true;
+    } catch (error) {
+      console.error('❌ API connection test failed:', error);
+      return false;
+    }
+  }
+
+  // Méthodes HTTP
   async get(endpoint, options = {}) {
     return this.request(endpoint, { method: 'GET', ...options });
   }
@@ -66,4 +100,11 @@ class ApiService {
   }
 }
 
-export default new ApiService();
+const apiService = new ApiService();
+
+// Test automatique au démarrage
+setTimeout(() => {
+  apiService.testConnection();
+}, 2000); // Attendre 2s que Vite soit prêt
+
+export default apiService;
