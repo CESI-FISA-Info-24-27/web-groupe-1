@@ -1,6 +1,6 @@
 services:
   # Base de données Cercle
-  cercle-db:
+  postgres:
     image: postgres:16.4
     container_name: cercle-db
     environment:
@@ -20,117 +20,106 @@ services:
     networks:
       - cercle_network
 
-  # Serveur de fichiers MinIO
-  minio:
-    image: minio/minio:latest
-    container_name: cercle-minio
-    ports:
-      - "${MINIO_API_PORT}:9000"          # API
-      - "${MINIO_CONSOLE_PORT}:9001"      # Console
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
-    command: server /data --console-address ":9001"
-    volumes:
-      - minio_data:/data
-    networks:
-      - cercle_network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 30s
-      timeout: 20s
-      retries: 3
+  # # Serveur de fichiers MinIO
+  # minio:
+  #   image: minio/minio:latest
+  #   container_name: cercle-minio
+  #   ports:
+  #     - "${MINIO_API_PORT}:9000"          # API
+  #     - "${MINIO_CONSOLE_PORT}:9001"      # Console
+  #   environment:
+  #     MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+  #     MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+  #   command: server /data --console-address ":9001"
+  #   volumes:
+  #     - minio_data:/data
+  #   networks:
+  #     - cercle_network
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+  #     interval: 30s
+  #     timeout: 20s
+  #     retries: 3
 
-  # Service pour créer les buckets automatiquement
-  minio-create-buckets:
-    image: minio/mc:latest
-    container_name: cercle-minio-setup
-    depends_on:
-      minio:
-        condition: service_healthy
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
-      MINIO_DEFAULT_BUCKETS: ${MINIO_DEFAULT_BUCKETS}
-    networks:
-      - cercle_network
-    entrypoint: >
-      /bin/sh -c "
-      echo 'Attente de MinIO...';
-      until mc alias set myminio http://minio:9000 \$$MINIO_ROOT_USER \$$MINIO_ROOT_PASSWORD; do
-        echo 'MinIO non disponible, nouvelle tentative dans 5 secondes...';
-        sleep 5;
-      done;
-      echo 'MinIO disponible, création des buckets...';
-      for bucket in \$$(echo \$$MINIO_DEFAULT_BUCKETS | tr ',' ' '); do
-        if ! mc ls myminio/\$$bucket > /dev/null 2>&1; then
-          echo \"Création du bucket: \$$bucket\";
-          mc mb myminio/\$$bucket;
-        else
-          echo \"Le bucket \$$bucket existe déjà\";
-        fi;
-      done;
-      echo 'Configuration terminée';
-      "
-    restart: "no"
+  # # Service pour créer les buckets automatiquement
+  # minio-create-buckets:
+  #   image: minio/mc:latest
+  #   container_name: cercle-minio-setup
+  #   depends_on:
+  #     minio:
+  #       condition: service_healthy
+  #   environment:
+  #     MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+  #     MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+  #     MINIO_DEFAULT_BUCKETS: ${MINIO_DEFAULT_BUCKETS}
+  #   networks:
+  #     - cercle_network
+  #   entrypoint: >
+  #     /bin/sh -c "
+  #     echo 'Attente de MinIO...';
+  #     until mc alias set myminio http://minio:9000 \$$MINIO_ROOT_USER \$$MINIO_ROOT_PASSWORD; do
+  #       echo 'MinIO non disponible, nouvelle tentative dans 5 secondes...';
+  #       sleep 5;
+  #     done;
+  #     echo 'MinIO disponible, création des buckets...';
+  #     for bucket in \$$(echo \$$MINIO_DEFAULT_BUCKETS | tr ',' ' '); do
+  #       if ! mc ls myminio/\$$bucket > /dev/null 2>&1; then
+  #         echo \"Création du bucket: \$$bucket\";
+  #         mc mb myminio/\$$bucket;
+  #       else
+  #         echo \"Le bucket \$$bucket existe déjà\";
+  #       fi;
+  #     done;
+  #     echo 'Configuration terminée';
+  #     "
+  #   restart: "no"
 
-  # API Backend (Mode développement avec npm run dev)
-  cercle-api:
+  # Backend API
+  backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
-      target: development
-    container_name: cercle-api
+    container_name: cercle-backend
     environment:
       - NODE_ENV=development
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-cercle_user}:${POSTGRES_PASSWORD:-cercle_password}@cercle-db:5432/${POSTGRES_DB:-cercle_db}
-      - JWT_SECRET=${JWT_SECRET:-dev-jwt-secret}
-      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET:-dev-refresh-secret}
-      - FRONTEND_URL=http://localhost:${FRONTEND_PORT:-5173}
-      - MINIO_ENDPOINT=minio
-      - MINIO_PORT=9000
-      - MINIO_ACCESS_KEY=${MINIO_ROOT_USER:-minioadmin}
-      - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD:-minioadmin123}
-      - MINIO_USE_SSL=false
+      - PORT=3000
+      - DATABASE_URL=postgresql://postgres:C3rcl3_53cr3t_5432@postgres:5432/cercle_db
+      - JWT_SECRET=dev-jwt-secret-super-long-and-secure
+      - JWT_REFRESH_SECRET=dev-refresh-secret-super-long-and-secure
+      - FRONTEND_URL=http://localhost:5173
     ports:
-      - "${API_PORT:-3001}:3000"
+      - "3000:3000"
     depends_on:
-      cercle-db:
-        condition: service_healthy
-      minio:
+      postgres:
         condition: service_healthy
     volumes:
-      # Montage du code source pour hot reload
       - ./backend:/app
-      - /app/node_modules  # Volume anonyme pour node_modules
-      - ./backend/uploads:/app/uploads
-      - ./backend/logs:/app/logs
+      - /app/node_modules
+    restart: unless-stopped
+    # Commande pour faire les migrations après démarrage
+    entrypoint: ["sh", "-c", "sleep 15 && npx prisma generate && npx prisma migrate dev --name init && npm run dev"]
     networks:
       - cercle_network
-    command: ["npm", "run", "dev"]
-    restart: unless-stopped
 
-  # Frontend (Mode développement avec npm run dev)
-  cercle-frontend:
+  # Frontend React
+  frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: cercle-frontend
     environment:
       - NODE_ENV=development
-      - VITE_API_BASE_URL=http://localhost:${API_PORT:-3001}
+      - VITE_API_BASE_URL=http://localhost:3000
     ports:
-      - "${FRONTEND_PORT:-5173}:5173"
+      - "5173:5173"
     depends_on:
-      - cercle-api
+      - backend
     volumes:
-      # Montage du code source pour hot reload
       - ./frontend:/app
-      - /app/node_modules  # Volume anonyme pour node_modules
+      - /app/node_modules
+    restart: unless-stopped
     networks:
       - cercle_network
-    command: ["npm", "run", "dev"]
-    restart: unless-stopped
 
 # Volumes pour la persistance
 volumes:
