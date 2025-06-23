@@ -169,7 +169,6 @@ bundle-report.html
 
 # Gatsby
 .cache/
-public
 
 # SvelteKit
 .svelte-kit
