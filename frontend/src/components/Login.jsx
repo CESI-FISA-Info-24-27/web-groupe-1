@@ -45,22 +45,33 @@ const Login = () => {
       // Utiliser le login du contexte au lieu d'AuthService directement
       const response = await login(credentials)
       
-      console.log('Connexion réussie:', response)
-      console.log('Redirect info:', response.redirect) // Debug pour voir les infos de redirection
+      // 🔍 DEBUG COMPLET - Voir TOUTE la structure de réponse
+      console.log('🔍 LOGIN DEBUG - Full response:', response)
+      console.log('👤 User data:', response.user)
+      console.log('🎭 User role data:', response.user?.role)
+      console.log('🔄 Redirect data:', response.redirect)
       
-      // ✅ AJOUT: Vérifier la redirection AVANT de naviguer
-      if (response.redirect && response.redirect.should_redirect) {
-        console.log(`🔄 Redirecting ${response.user.role} to admin dashboard`)
-        navigate(response.redirect.redirect_to)
+      // 🔧 CORRECTION 1 : Vérifier DIRECTEMENT le rôle de l'utilisateur
+      const userRole = response.user?.role?.role
+      const isAdminOrModerator = userRole === 'ADMIN' || userRole === 'MODERATOR'
+      
+      console.log('🎯 User role detected:', userRole)
+      console.log('🔑 Is admin or moderator:', isAdminOrModerator)
+      
+      // 🔧 CORRECTION 2 : Logique de redirection simplifiée et robuste
+      if (isAdminOrModerator) {
+        console.log('🔄 Redirecting admin/moderator to dashboard')
+        navigate('/admin/dashboard', { replace: true })
+      } else if (response.redirect?.should_redirect && response.redirect?.redirect_to) {
+        console.log('🔄 Using backend redirect info:', response.redirect.redirect_to)
+        navigate(response.redirect.redirect_to, { replace: true })
       } else {
-        // Redirection normale vers le feed pour les utilisateurs
-        navigate('/feed', { 
-          replace: true
-        })
+        console.log('🔄 Redirecting regular user to feed')
+        navigate('/feed', { replace: true })
       }
       
     } catch (error) {
-      console.error('Erreur de connexion:', error)
+      console.error('❌ Login error:', error)
       
       // 🔥 NOUVEAU : Gestion de l'email non vérifié
       if (error.requiresVerification) {
