@@ -81,14 +81,14 @@ services:
       dockerfile: Dockerfile
     container_name: cercle-backend
     environment:
-      - NODE_ENV=development
-      - PORT=3000
-      - DATABASE_URL=postgresql://postgres:C3rcl3_53cr3t_5432@postgres:5432/cercle_db
-      - JWT_SECRET=dev-jwt-secret-super-long-and-secure
-      - JWT_REFRESH_SECRET=dev-refresh-secret-super-long-and-secure
-      - FRONTEND_URL=http://localhost:5173
+      NODE_ENV: ${NODE_ENV}
+      PORT: ${API_PORT}
+      DATABASE_URL: ${DATABASE_URL}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      FRONTEND_URL: ${FRONTEND_URL}
     ports:
-      - "3000:3000"
+      - "${API_PORT}:${API_PORT}"
     depends_on:
       postgres:
         condition: service_healthy
@@ -107,10 +107,10 @@ services:
       dockerfile: Dockerfile
     container_name: cercle-frontend
     environment:
-      - NODE_ENV=development
-      - VITE_API_BASE_URL=http://backend:3000
+      NODE_ENV: ${NODE_ENV}
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL}
     ports:
-      - "5173:5173"
+      - "${FRONTEND_PORT}:${FRONTEND_PORT}"
     depends_on:
       - backend
     volumes:
