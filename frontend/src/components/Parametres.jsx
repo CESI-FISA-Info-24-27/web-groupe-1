@@ -68,7 +68,7 @@ const Parametres = () => {
 
   // Rafraîchir les données au chargement du composant
   useEffect(() => {
-    refreshUserData()
+    // refreshUserData()
   }, [])
 
   const handleInputChange = (e) => {
@@ -87,13 +87,19 @@ const Parametres = () => {
     try {
       const token = localStorage.getItem('accessToken')
       
-      const response = await fetch('/api/v1/users/profile', {
+      const response = await fetch('/api/v1/users/me', {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(formData)
+        body: JSON.stringify({
+          bio: formData.bio,
+          nom: formData.nom,
+          prenom: formData.prenom,
+          telephone: formData.telephone,
+          private: formData.private
+        })
       })
 
       if (response.ok) {
@@ -103,7 +109,7 @@ const Parametres = () => {
         setIsEditing(false)
         
         // Rafraîchir les données pour être sûr
-        await refreshUserData()
+        // await refreshUserData()
       } else {
         const errorData = await response.json()
         setError(errorData.message || 'Erreur lors de la mise à jour')

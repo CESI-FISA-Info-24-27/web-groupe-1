@@ -446,13 +446,13 @@ class AuthController {
    */
   static async me(req, res) {
     try {
-      const userId = req.user.userId;
+      const userId = req.user.id_user;
 
       const user = await prisma.user.findFirst({
         where: { 
           id_user: userId,
           is_active: true,
-          email_verified: true  // 🔥 NOUVEAU : S'assurer que l'email est vérifié
+          email_verified: true
         },
         include: {
           role: true,
