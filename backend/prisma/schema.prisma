@@ -102,12 +102,6 @@ model User {
   updated_at    DateTime
   last_login    DateTime?
   
-  // 🔥 NOUVEAUX CHAMPS : Vérification email
-  email_verified              Boolean   @default(false)
-  verification_code           String?   @db.VarChar(6)
-  verification_code_expires_at DateTime?
-  verification_attempts       Int       @default(0)
-  
   // Relations
   role Role @relation(fields: [id_role], references: [id_role])
   
