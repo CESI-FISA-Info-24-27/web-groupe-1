@@ -1,206 +1,205 @@
-// src/context/AuthContext.jsx - Version améliorée avec gestion proactive des tokens
-import { createContext, useContext, useState, useEffect, useCallback } from 'react'
-import AuthService from '../services/authService'
-import ApiService from '../services/api'
+// frontend/src/context/AuthContext.jsx
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import AuthService from '../services/authService';
 
-const AuthContext = createContext()
+const AuthContext = createContext();
 
 export const useAuth = () => {
-  const context = useContext(AuthContext)
+  const context = useContext(AuthContext);
   if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider')
+    throw new Error('useAuth must be used within an AuthProvider');
   }
-  return context
-}
+  return context;
+};
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  // ✅ NOUVEAU: Fonction pour vérifier la validité du token
-  const checkTokenValidity = useCallback(async () => {
-    const token = localStorage.getItem('accessToken')
-    const refreshToken = localStorage.getItem('refreshToken')
-    
-    if (!token || !refreshToken) {
-      return false
-    }
-
-    try {
-      // Vérifier si le token est proche de l'expiration
-      await ApiService.refreshTokenIfNeeded()
-      
-      // Tester le token avec un appel API
-      const response = await ApiService.get('/api/v1/auth/me')
-      return !!response
-    } catch (error) {
-      console.error('Token validation failed:', error)
-      return false
-    }
-  }, [])
-
-  // ✅ NOUVEAU: Intervalles pour refresh automatique
+  // Vérifier l'authentification au chargement
   useEffect(() => {
-    let tokenCheckInterval
+    checkAuth();
+  }, []);
 
-    if (isAuthenticated) {
-      // Vérifier le token toutes les 5 minutes
-      tokenCheckInterval = setInterval(async () => {
-        console.log('🔍 Checking token validity...')
-        
-        const isValid = await checkTokenValidity()
-        if (!isValid) {
-          console.log('❌ Token invalid, logging out...')
-          await logout()
-        }
-      }, 5 * 60 * 1000) // 5 minutes
-    }
-
-    return () => {
-      if (tokenCheckInterval) {
-        clearInterval(tokenCheckInterval)
-      }
-    }
-  }, [isAuthenticated, checkTokenValidity])
-
-  // ✅ AMÉLIORÉ: Initialisation avec vérification du token
-  useEffect(() => {
-    const initAuth = async () => {
-      try {
-        if (AuthService.isAuthenticated()) {
-          const storedUser = AuthService.getStoredUser()
-          
-          if (storedUser) {
-            // Vérifier que le token est encore valide
-            const isValid = await checkTokenValidity()
-            
-            if (isValid) {
-              setUser(storedUser)
-              setIsAuthenticated(true)
-              console.log('👤 User restored from storage:', storedUser.username)
-            } else {
-              console.log('🔑 Stored token invalid, clearing storage')
-              AuthService.clearStorage()
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Auth initialization failed:', error)
-        AuthService.clearStorage()
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    initAuth()
-  }, [checkTokenValidity])
-
-  // ✅ AMÉLIORÉ: Login avec gestion des erreurs
-  const login = async (credentials) => {
+  const checkAuth = async () => {
     try {
-      const response = await AuthService.login(credentials)
-      setUser(response.user)
-      setIsAuthenticated(true)
-      console.log('✅ User logged in:', response.user.username)
-      return response
-    } catch (error) {
-      console.error('❌ Login failed:', error)
-      // Si l'erreur est liée aux tokens, nettoyer le storage
-      if (error.message.includes('token') || error.message.includes('authentication')) {
-        AuthService.clearStorage()
+      const token = localStorage.getItem('accessToken');
+      if (token) {
+        // Vérifier si le token est valide en récupérant les infos utilisateur
+        const userData = await AuthService.getCurrentUser();
+        setUser(userData);
+        setIsAuthenticated(true);
+        console.log('✅ User authenticated:', userData.username);
+      } else {
+        console.log('🔑 No token found');
       }
-      throw error
+    } catch (error) {
+      console.error('Auth check failed:', error);
+      AuthService.clearStorage();
+      setUser(null);
+      setIsAuthenticated(false);
+    } finally {
+      setLoading(false);
     }
-  }
+  };
 
+  /**
+   * Inscription (maintenant retourne les infos pour vérification)
+   */
   const register = async (userData) => {
     try {
-      const response = await AuthService.register(userData)
-      setUser(response.user)
-      setIsAuthenticated(true)
-      console.log('✅ User registered:', response.user.username)
-      return response
+      const response = await AuthService.register(userData);
+      
+      // ⚠️ Ne pas connecter l'utilisateur ici, il doit d'abord vérifier son email
+      console.log('📧 Registration successful, verification required');
+      return response;
     } catch (error) {
-      console.error('❌ Registration failed:', error)
-      throw error
+      console.error('❌ Registration failed:', error);
+      throw error;
     }
-  }
+  };
 
+  /**
+   * 🔥 NOUVEAU : Vérification d'email (connecte l'utilisateur après vérification)
+   */
+  const verifyEmail = async (email, code) => {
+    try {
+      const response = await AuthService.verifyEmail(email, code);
+      
+      // Maintenant l'utilisateur est connecté
+      setUser(response.user);
+      setIsAuthenticated(true);
+      console.log('✅ Email verified, user logged in:', response.user.username);
+      
+      return response;
+    } catch (error) {
+      console.error('❌ Email verification failed:', error);
+      throw error;
+    }
+  };
+
+  /**
+   * 🔥 NOUVEAU : Renvoyer le code de vérification
+   */
+  const resendVerificationCode = async (email) => {
+    try {
+      const response = await AuthService.resendVerificationCode(email);
+      console.log('📧 Verification code resent to:', email);
+      return response;
+    } catch (error) {
+      console.error('❌ Failed to resend verification code:', error);
+      throw error;
+    }
+  };
+
+  /**
+   * Connexion (gère la redirection vers vérification si nécessaire)
+   */
+  const login = async (credentials) => {
+    try {
+      const response = await AuthService.login(credentials);
+      
+      setUser(response.user);
+      setIsAuthenticated(true);
+      console.log('✅ User logged in:', response.user.username);
+      
+      return response;
+    } catch (error) {
+      console.error('❌ Login failed:', error);
+      
+      // Si l'email n'est pas vérifié, l'erreur contiendra les infos de redirection
+      if (error.requiresVerification) {
+        console.log('📧 Email verification required for:', error.email);
+        throw {
+          ...error,
+          requiresVerification: true,
+          email: error.email
+        };
+      }
+      
+      // Si l'erreur est liée aux tokens, nettoyer le storage
+      if (error.message.includes('token') || error.message.includes('authentication')) {
+        AuthService.clearStorage();
+      }
+      throw error;
+    }
+  };
+
+  /**
+   * Déconnexion
+   */
   const logout = async () => {
     try {
-      await AuthService.logout()
-      console.log('👋 User logged out')
+      await AuthService.logout();
+      console.log('👋 User logged out');
     } catch (error) {
-      console.error('Logout error:', error)
+      console.error('Logout error:', error);
     } finally {
-      setUser(null)
-      setIsAuthenticated(false)
+      setUser(null);
+      setIsAuthenticated(false);
       // Redirection sera gérée par le composant
     }
-  }
+  };
 
-  // ✅ NOUVEAU: Fonction pour rafraîchir les données utilisateur
+  /**
+   * Rafraîchir le token
+   */
+  const refreshToken = async () => {
+    try {
+      const response = await AuthService.refreshToken();
+      console.log('🔄 Token refreshed successfully');
+      return response;
+    } catch (error) {
+      console.error('❌ Token refresh failed:', error);
+      logout(); // Si refresh échoue, déconnecter
+      throw error;
+    }
+  };
+
+  /**
+   * 🔥 NOUVEAU : Fonction pour rafraîchir les données utilisateur
+   */
   const refreshUser = async () => {
-    if (!isAuthenticated) return
+    if (!isAuthenticated) return;
 
     try {
-      const updatedUser = await ApiService.get('/api/v1/auth/me')
-      setUser(updatedUser)
-      localStorage.setItem('user', JSON.stringify(updatedUser))
-      console.log('🔄 User data refreshed')
+      const updatedUser = await AuthService.getCurrentUser();
+      setUser(updatedUser);
+      console.log('🔄 User data refreshed');
     } catch (error) {
-      console.error('Failed to refresh user data:', error)
+      console.error('Failed to refresh user data:', error);
       // Si l'erreur est d'authentification, déconnecter
       if (error.message.includes('401') || error.message.includes('authentication')) {
-        await logout()
+        await logout();
       }
     }
-  }
+  };
 
   const updateUser = (updatedUser) => {
-    setUser(updatedUser)
-    localStorage.setItem('user', JSON.stringify(updatedUser))
-  }
-
-  // ✅ NOUVEAU: Fonction utilitaire pour vérifier l'expiration du token
-  const getTokenExpiryInfo = () => {
-    const token = localStorage.getItem('accessToken')
-    if (!token) return null
-
-    try {
-      const payload = JSON.parse(atob(token.split('.')[1]))
-      const expiryTime = payload.exp * 1000
-      const currentTime = Date.now()
-      const timeUntilExpiry = expiryTime - currentTime
-
-      return {
-        expiresAt: new Date(expiryTime),
-        timeUntilExpiry,
-        isExpired: timeUntilExpiry <= 0,
-        isNearExpiry: timeUntilExpiry < 2 * 60 * 1000 // < 2 minutes
-      }
-    } catch (error) {
-      return null
-    }
-  }
+    setUser(updatedUser);
+    localStorage.setItem('user', JSON.stringify(updatedUser));
+    console.log('👤 User data updated locally');
+  };
 
   const value = {
+    isAuthenticated,
     user,
     loading,
-    isAuthenticated,
-    login,
     register,
+    verifyEmail,           // 🔥 NOUVEAU
+    resendVerificationCode, // 🔥 NOUVEAU
+    login,
     logout,
+    refreshToken,
+    refreshUser,           // 🔥 NOUVEAU
     updateUser,
-    refreshUser, // ✅ NOUVEAU
-    checkTokenValidity, // ✅ NOUVEAU
-    getTokenExpiryInfo // ✅ NOUVEAU
-  }
+    checkAuth
+  };
 
   return (
     <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
-  )
-}
+  );
+};

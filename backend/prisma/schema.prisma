@@ -1,4 +1,4 @@
-// backend/prisma/schema.prisma
+// backend/prisma/schema.prisma - VOTRE SCHÉMA ORIGINAL + vérification email
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
@@ -102,7 +102,13 @@ model User {
   updated_at    DateTime
   last_login    DateTime?
   
-  // Relations
+  // 🔥 NOUVEAUX CHAMPS : Vérification email (ajoutés à votre schéma)
+  email_verified              Boolean   @default(false)
+  verification_code           String?   @db.VarChar(6)
+  verification_code_expires_at DateTime?
+  verification_attempts       Int       @default(0)
+  
+  // Relations (exactement comme dans votre schéma original)
   role Role @relation(fields: [id_role], references: [id_role])
   
   // Préférences utilisateur (relation 1:1)

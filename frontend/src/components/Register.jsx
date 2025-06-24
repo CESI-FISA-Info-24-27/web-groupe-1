@@ -102,11 +102,13 @@ const Register = () => {
       
       console.log('Inscription réussie:', response)
       
-      // ✅ SEULE MODIFICATION: Redirection vers l'onboarding au lieu du feed
-      navigate('/onboarding', { 
+      // 🔥 MODIFICATION : Redirection vers la vérification email au lieu de l'onboarding
+      navigate('/verify-email', { 
         replace: true,
         state: { 
-          message: `Bienvenue ${response.user.prenom} ! Configurons votre profil.` 
+          email: formData.email.trim(),
+          userName: formData.firstName.trim(),
+          message: `Compte créé avec succès ! Vérifiez votre email pour continuer.` 
         }
       })
       
@@ -124,7 +126,7 @@ const Register = () => {
       {/* Partie gauche - Image (visible uniquement sur écrans larges xl+) */}
       <div className="hidden xl:flex xl:w-1/2 relative">
         <img 
-          src="https://images.unsplash.com/photo-1735252723552-138dc3fb6f14?q=80&w=1974&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+          src="https://images.unsplash.com/photo-1735252723552-138dc3fb6f14?q=80&w=1974&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3rxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
           alt="Équipe de travail collaborative"
           className="w-full h-full object-cover"
         />

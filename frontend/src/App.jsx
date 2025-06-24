@@ -1,4 +1,4 @@
-// src/App.jsx - Routes admin corrigées
+// src/App.jsx - Routes avec vérification email intégrée
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
 import { LoaderProvider } from './context/LoaderContext'
@@ -8,6 +8,7 @@ import PageLoader from './components/PageLoader'
 import Home from './components/Home'
 import Login from './components/Login'
 import Register from './components/Register'
+import EmailVerification from './components/EmailVerification' // 🔥 NOUVEAU
 import Onboarding from './components/Onboarding'
 import About from './components/About'
 import Profile from './components/Profile'
@@ -18,7 +19,7 @@ import Messages from './components/Messages'
 import Friends from './components/Friends'
 import Parametres from './components/Parametres'
 
-// ✅ Import du composant admin modulaire
+// Import du composant admin modulaire
 import AdminDashboard from './components/admin/AdminDashboard'
 
 import ProtectedRoute from './components/ProtectedRoute'
@@ -32,10 +33,14 @@ function App() {
             <PageLoader />
             
             <Routes>
+              {/* Routes publiques */}
               <Route path="/" element={<Home />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="/about" element={<About />} />
+              
+              {/* 🔥 NOUVELLE ROUTE : Vérification email (publique mais avec données) */}
+              <Route path="/verify-email" element={<EmailVerification />} />
               
               {/* Onboarding pour les nouveaux utilisateurs */}
               <Route 
@@ -117,7 +122,7 @@ function App() {
                 } 
               />
               
-              {/* ✅ ROUTES ADMIN MODULAIRES */}
+              {/* ROUTES ADMIN MODULAIRES */}
               
               {/* Dashboard Admin - Vue d'ensemble */}
               <Route 
