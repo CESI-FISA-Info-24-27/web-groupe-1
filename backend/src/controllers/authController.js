@@ -1,121 +1,95 @@
-// backend/src/controllers/authController.js - VERSION COMPLÈTE AVEC VÉRIFICATION EMAIL
-const bcrypt = require('bcrypt');
-const prisma = require('../utils/database');
+// backend/src/controllers/authController.js - VERSION COMPLÈTE CORRIGÉE (SOLUTION PROPRE)
+const bcrypt = require('bcryptjs');
+const { PrismaClient } = require('@prisma/client');
+const logger = require('../utils/logger');
 const TokenService = require('../services/tokenService');
-const EmailService = require('../services/emailService'); // 🔥 NOUVEAU
+const EmailService = require('../services/emailService'); // ← Import de l'instance
 const { 
   registerSchema, 
   loginSchema, 
   refreshSchema, 
   changePasswordSchema,
-  verificationSchema,     // 🔥 NOUVEAU
-  resendCodeSchema       // 🔥 NOUVEAU
+  verificationSchema,
+  resendCodeSchema 
 } = require('../validators/authValidator');
-const logger = require('../utils/logger');
+
+const prisma = new PrismaClient();
 
 class AuthController {
   /**
-   * Inscription d'un nouvel utilisateur avec envoi de code de vérification
+   * Inscription d'un utilisateur avec envoi d'email de vérification
    */
   static async register(req, res) {
     try {
+      // Validation des données
       const { error, value } = registerSchema.validate(req.body);
       if (error) {
         return res.status(400).json({ error: error.details[0].message });
       }
 
-      const { username, mail, password, nom, prenom, telephone } = value;
+      const { username, mail, password, nom, prenom } = value;
 
-      // Vérifier si un compte ACTIF existe déjà avec le même mail
-      const existingUserByMail = await prisma.user.findFirst({
+      // Vérifier si l'utilisateur existe déjà
+      const existingUser = await prisma.user.findFirst({
         where: {
-          mail: mail,
+          OR: [
+            { username: username },
+            { mail: mail }
+          ],
           is_active: true
         }
       });
 
-      if (existingUserByMail) {
+      if (existingUser) {
+        const field = existingUser.username === username ? 'username' : 'email';
         return res.status(409).json({ 
           error: 'User already exists',
-          message: 'This email is already taken by an active account'
+          message: `This ${field} is already taken`
         });
       }
 
-      // Vérifier si un compte ACTIF existe déjà avec le même username
-      const existingUserByUsername = await prisma.user.findFirst({
-        where: {
-          username: username,
-          is_active: true
-        }
-      });
+      // ✅ CORRECTION : Générer le code avec une fonction helper locale
+      const generateVerificationCode = () => {
+        return Math.floor(100000 + Math.random() * 900000).toString();
+      };
 
-      if (existingUserByUsername) {
-        return res.status(409).json({ 
-          error: 'User already exists',
-          message: 'This username is already taken by an active account'
-        });
-      }
-
-      // Vérifier si un compte ACTIF existe déjà avec le même numéro de téléphone (si fourni)
-      if (telephone) {
-        const existingUserByPhone = await prisma.user.findFirst({
-          where: {
-            telephone: telephone,
-            is_active: true
-          }
-        });
-
-        if (existingUserByPhone) {
-          return res.status(409).json({ 
-            error: 'User already exists',
-            message: 'This phone number is already taken by an active account'
-          });
-        }
-      }
-
-      // 🔥 NOUVEAU : Générer le code de vérification
-      const verificationCode = EmailService.generateVerificationCode();
+      const verificationCode = generateVerificationCode();
       const codeExpiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
 
-      // Récupérer le rôle USER par défaut
-      const userRole = await prisma.role.findFirst({
-        where: { role: 'USER' }
-      });
+      logger.info(`Generated verification code for ${mail}: ${verificationCode}`);
 
-      if (!userRole) {
-        return res.status(500).json({ 
-          error: 'System configuration error',
-          message: 'Default user role not found'
-        });
-      }
-
-      // Hasher le mot de passe
-      const saltRounds = parseInt(process.env.BCRYPT_ROUNDS) || 12;
-      const passwordHash = await bcrypt.hash(password, saltRounds);
-
-      // Créer l'utilisateur avec toutes les relations
+      // Transaction pour créer l'utilisateur et ses préférences
       const result = await prisma.$transaction(async (tx) => {
+        // Hacher le mot de passe
+        const saltRounds = parseInt(process.env.BCRYPT_ROUNDS) || 12;
+        const password_hash = await bcrypt.hash(password, saltRounds);
+
+        // Récupérer le rôle USER par défaut
+        const userRole = await tx.role.findFirst({ where: { role: 'USER' } });
+        if (!userRole) {
+          throw new Error('Default USER role not found');
+        }
+
         const currentDate = new Date();
 
-        // Créer l'utilisateur (NON VÉRIFIÉ)
+        // Créer l'utilisateur
         const user = await tx.user.create({
           data: {
             username,
-            mail,
-            password_hash: passwordHash,
             nom,
             prenom,
-            telephone: telephone || null,
-            bio: `Salut ! Je suis ${prenom}, ravi de rejoindre la communauté ! 👋`,
+            mail,
+            password_hash,
+            bio: `Salut ! 👋 Je suis ${prenom}, ravi de rejoindre la communauté ! 👋`,
             photo_profil: null,
             id_role: userRole.id_role,
             private: false,
             certified: false,
             is_active: true,
-            email_verified: false,  // 🔥 NOUVEAU
-            verification_code: verificationCode,  // 🔥 NOUVEAU
-            verification_code_expires_at: codeExpiresAt,  // 🔥 NOUVEAU
-            verification_attempts: 0,  // 🔥 NOUVEAU
+            email_verified: false,
+            verification_code: verificationCode,
+            verification_code_expires_at: codeExpiresAt,
+            verification_attempts: 0,
             created_at: currentDate,
             updated_at: currentDate,
             last_login: null
@@ -141,24 +115,24 @@ class AuthController {
         return user;
       });
 
-      // 🔥 NOUVEAU : Envoyer l'email de vérification
+      // ✅ ENVOYER L'EMAIL DE VÉRIFICATION (utilise l'instance)
       try {
         await EmailService.sendVerificationEmail(mail, verificationCode, prenom);
-        logger.info(`Verification email sent to ${mail} for user ${username}`);
+        logger.info(`✅ Verification email sent to ${mail} for user ${username}`);
       } catch (emailError) {
-        logger.error('Failed to send verification email:', emailError);
+        logger.error('❌ Failed to send verification email:', emailError);
         // On continue quand même, l'utilisateur peut redemander le code
       }
 
       logger.info(`New user registered (pending verification): ${result.username} (${result.mail})`);
 
-      // 🔥 MODIFICATION : Retourner la réponse sans les tokens car pas encore vérifié
+      // Retourner la réponse sans les données sensibles
       const { password_hash: _, verification_code: __, ...userResponse } = result;
 
       res.status(201).json({
         message: 'User created successfully. Please check your email for verification code.',
         user: userResponse,
-        requiresVerification: true,  // 🔥 NOUVEAU
+        requiresVerification: true,
         email: mail
       });
     } catch (error) {
@@ -244,7 +218,7 @@ class AuthController {
 
       // Envoyer email de bienvenue (optionnel)
       try {
-        await EmailService.sendWelcomeEmail(mail, prenom);
+        await EmailService.sendWelcomeEmail(mail, user.prenom);
       } catch (emailError) {
         logger.error('Failed to send welcome email:', emailError);
         // Ne pas faire échouer le processus
@@ -295,8 +269,12 @@ class AuthController {
         });
       }
 
-      // Générer un nouveau code
-      const verificationCode = EmailService.generateVerificationCode();
+      // ✅ CORRECTION : Fonction helper locale pour générer le code
+      const generateVerificationCode = () => {
+        return Math.floor(100000 + Math.random() * 900000).toString();
+      };
+
+      const verificationCode = generateVerificationCode();
       const codeExpiresAt = new Date(Date.now() + 15 * 60 * 1000);
 
       // Mettre à jour l'utilisateur
@@ -309,10 +287,17 @@ class AuthController {
         }
       });
 
-      // Envoyer le nouvel email
-      await EmailService.sendVerificationEmail(mail, verificationCode, user.prenom);
-
-      logger.info(`Verification code resent to ${mail}`);
+      // ✅ ENVOYER LE NOUVEL EMAIL (utilise l'instance)
+      try {
+        await EmailService.sendVerificationEmail(mail, verificationCode, user.prenom);
+        logger.info(`✅ Verification code resent to ${mail}`);
+      } catch (emailError) {
+        logger.error('❌ Failed to resend verification email:', emailError);
+        return res.status(500).json({ 
+          error: 'Failed to send email',
+          message: 'Unable to send verification code'
+        });
+      }
 
       res.status(200).json({
         message: 'Verification code sent successfully',
@@ -363,6 +348,7 @@ class AuthController {
         });
       }
 
+      // Vérifier le mot de passe
       const isPasswordValid = await bcrypt.compare(password, user.password_hash);
       if (!isPasswordValid) {
         return res.status(401).json({ 
@@ -371,10 +357,10 @@ class AuthController {
         });
       }
 
-      // Génération automatique des tokens
+      // Générer les tokens JWT
       const { accessToken, refreshToken } = TokenService.generateTokens(user.id_user);
 
-      // Mettre à jour la dernière connexion
+      // Mettre à jour la date de dernière connexion
       await prisma.user.update({
         where: { id_user: user.id_user },
         data: { last_login: new Date() }
@@ -382,8 +368,8 @@ class AuthController {
 
       logger.info(`User logged in: ${user.username} (${user.mail})`);
 
-      // Retourner les informations sans le hash du mot de passe
-      const { password_hash: _, ...userResponse } = user;
+      // Retourner les tokens et infos utilisateur (sans le mot de passe)
+      const { password_hash: _, verification_code: __, ...userResponse } = user;
 
       res.status(200).json({
         message: 'Login successful',
@@ -399,7 +385,7 @@ class AuthController {
   }
 
   /**
-   * Rafraîchissement du token d'accès
+   * Rafraîchir le token d'accès
    */
   static async refresh(req, res) {
     try {
@@ -411,50 +397,46 @@ class AuthController {
       const { refreshToken } = value;
 
       try {
+        // Vérifier et décoder le refresh token
         const decoded = TokenService.verifyRefreshToken(refreshToken);
         
+        // Vérifier que l'utilisateur existe toujours et est actif
         const user = await prisma.user.findFirst({
           where: { 
-            id_user: decoded.id_user,
-            is_active: true
-          }
+            id_user: decoded.userId,
+            is_active: true,
+            email_verified: true  // 🔥 NOUVEAU : Vérifier que l'email est toujours vérifié
+          },
+          include: { role: true }
         });
 
         if (!user) {
           return res.status(401).json({ 
-            error: 'Invalid token',
+            error: 'Invalid refresh token',
             message: 'User not found or inactive'
           });
         }
 
-        const newAccessToken = TokenService.generateAccessToken({
-          id_user: user.id_user,
-          username: user.username,
-          mail: user.mail
-        });
+        // Générer un nouveau token d'accès
+        const { accessToken } = TokenService.generateTokens(user.id_user);
 
-        res.json({
-          accessToken: newAccessToken,
+        logger.info(`Token refreshed for user: ${user.username}`);
+
+        res.status(200).json({
           message: 'Token refreshed successfully',
-          expiresIn: 3600,
-          user: {
-            id_user: user.id_user,
-            username: user.username,
-            mail: user.mail,
-            nom: user.nom,
-            prenom: user.prenom
-          }
+          accessToken
         });
 
       } catch (tokenError) {
-        console.error('Token verification error:', tokenError);
+        logger.error('Invalid refresh token:', tokenError);
         return res.status(401).json({ 
-          error: 'Invalid token',
-          message: 'Refresh token is invalid or expired'
+          error: 'Invalid refresh token',
+          message: 'Please log in again'
         });
       }
+
     } catch (error) {
-      console.error('Refresh token error:', error);
+      logger.error('Refresh token error:', error);
       res.status(500).json({ error: 'Internal server error' });
     }
   }
@@ -464,11 +446,17 @@ class AuthController {
    */
   static async me(req, res) {
     try {
-      const user = await prisma.user.findUnique({
-        where: { id_user: req.user.id_user },
-        include: { 
+      const userId = req.user.userId;
+
+      const user = await prisma.user.findFirst({
+        where: { 
+          id_user: userId,
+          is_active: true,
+          email_verified: true  // 🔥 NOUVEAU : S'assurer que l'email est vérifié
+        },
+        include: {
           role: true,
-          user_preferences: {
+          userPreferences: {
             include: {
               langue: true,
               theme: true
@@ -476,48 +464,36 @@ class AuthController {
           },
           _count: {
             select: {
-              posts: { where: { active: true } },
-              followers: { where: { active: true, pending: false } },
-              following: { where: { active: true, pending: false } },
-              likes: true,
-              messages_sent: { where: { active: true } },
-              messages_received: { where: { active: true } }
+              posts: true,
+              followers: true,
+              following: true
             }
           }
         }
       });
 
       if (!user) {
-        return res.status(404).json({ error: 'User not found' });
+        return res.status(404).json({ 
+          error: 'User not found',
+          message: 'Account may have been deactivated'
+        });
       }
 
-      // Retourner toutes les informations sans le hash du mot de passe
-      const { password_hash: _, verification_code: __, ...userInfo } = user;
+      // Exclure les données sensibles
+      const { password_hash: _, verification_code: __, ...userResponse } = user;
 
-      res.json({
-        user: {
-          ...userInfo,
-          preferences: userInfo.user_preferences,
-          stats: {
-            posts: userInfo._count.posts,
-            followers: userInfo._count.followers,
-            following: userInfo._count.following,
-            likes: userInfo._count.likes,
-            messagesSent: userInfo._count.messages_sent,
-            messagesReceived: userInfo._count.messages_received
-          },
-          user_preferences: undefined,
-          _count: undefined
-        }
+      res.status(200).json({
+        user: userResponse
       });
+
     } catch (error) {
-      logger.error('Get me error:', error);
+      logger.error('Get user info error:', error);
       res.status(500).json({ error: 'Internal server error' });
     }
   }
 
   /**
-   * Changement de mot de passe
+   * Changer le mot de passe
    */
   static async changePassword(req, res) {
     try {
@@ -527,30 +503,38 @@ class AuthController {
       }
 
       const { currentPassword, newPassword } = value;
-      const userId = req.user.id_user;
+      const userId = req.user.userId;
 
+      // Récupérer l'utilisateur
       const user = await prisma.user.findFirst({
-        where: { id_user: userId }
+        where: { 
+          id_user: userId,
+          is_active: true,
+          email_verified: true  // 🔥 NOUVEAU : Vérifier que l'email est vérifié
+        }
       });
 
       if (!user) {
         return res.status(404).json({ 
           error: 'User not found',
-          message: 'User account not found'
+          message: 'Account may have been deactivated'
         });
       }
 
+      // Vérifier le mot de passe actuel
       const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.password_hash);
       if (!isCurrentPasswordValid) {
         return res.status(400).json({ 
-          error: 'Invalid password',
+          error: 'Invalid current password',
           message: 'Current password is incorrect'
         });
       }
 
+      // Hacher le nouveau mot de passe
       const saltRounds = parseInt(process.env.BCRYPT_ROUNDS) || 12;
       const newPasswordHash = await bcrypt.hash(newPassword, saltRounds);
 
+      // Mettre à jour le mot de passe
       await prisma.user.update({
         where: { id_user: userId },
         data: { 
@@ -559,11 +543,12 @@ class AuthController {
         }
       });
 
-      logger.info(`Password changed for user: ${user.username} (${user.mail})`);
+      logger.info(`Password changed for user: ${user.username}`);
 
-      res.json({
+      res.status(200).json({
         message: 'Password changed successfully'
       });
+
     } catch (error) {
       logger.error('Change password error:', error);
       res.status(500).json({ error: 'Internal server error' });
@@ -571,16 +556,24 @@ class AuthController {
   }
 
   /**
-   * Déconnexion
+   * Déconnexion (optionnel - côté client principalement)
    */
   static async logout(req, res) {
     try {
-      logger.info(`User logged out: ${req.user.username} (${req.user.mail})`);
-      
-      res.json({
-        message: 'Logout successful',
-        note: 'Please remove tokens from client storage'
+      const userId = req.user.userId;
+
+      // Optionnel : enregistrer la déconnexion en base
+      await prisma.user.update({
+        where: { id_user: userId },
+        data: { updated_at: new Date() }
       });
+
+      logger.info(`User logged out: ${userId}`);
+
+      res.status(200).json({
+        message: 'Logout successful'
+      });
+
     } catch (error) {
       logger.error('Logout error:', error);
       res.status(500).json({ error: 'Internal server error' });

@@ -1,43 +1,32 @@
-// backend/src/services/emailService.js - VERSION CORRIGÉE
+// backend/src/services/emailService.js - VERSION DEBUG
 const nodemailer = require('nodemailer');
 const logger = require('../utils/logger');
 
 class EmailService {
   constructor() {
-    // 🔥 CORRECTION: createTransport au lieu de createTransporter
+    // 🔍 DEBUG: Afficher les variables d'environnement
+    console.log('🔍 DEBUG EMAIL CONFIG:');
+    console.log('  EMAIL_USER:', process.env.EMAIL_USER);
+    console.log('  EMAIL_PASSWORD:', process.env.EMAIL_PASSWORD ? 
+      `Défini (${process.env.EMAIL_PASSWORD.length} chars): ${process.env.EMAIL_PASSWORD.substring(0, 4)}****` : 
+      'NON DÉFINI');
+    console.log('  EMAIL_FROM:', process.env.EMAIL_FROM);
+    
     this.transporter = nodemailer.createTransport({
-      // Option 1: Gmail
       service: 'gmail',
       auth: {
         user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASSWORD // App password pour Gmail
-      }
-      
-      // Option 2: SMTP générique (décommentez si besoin)
-      /*
-      host: process.env.SMTP_HOST,
-      port: process.env.SMTP_PORT,
-      secure: process.env.SMTP_SECURE === 'true',
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASSWORD
-      }
-      */
+        pass: process.env.EMAIL_PASSWORD
+      },
+      debug: true,
+      logger: true
     });
   }
 
-  /**
-   * Génère un code de vérification à 6 chiffres
-   */
-  generateVerificationCode() {
-    return Math.floor(100000 + Math.random() * 900000).toString();
-  }
-
-  /**
-   * Envoie un email de vérification avec le code
-   */
   async sendVerificationEmail(email, code, prenom = '') {
     try {
+      logger.info(`Attempting to send verification email to ${email}`);
+      
       const mailOptions = {
         from: {
           name: 'CERCLE',
@@ -45,25 +34,31 @@ class EmailService {
         },
         to: email,
         subject: 'Confirmez votre compte CERCLE',
-        html: this.getVerificationEmailTemplate(code, prenom)
+        html: this.getVerificationEmailTemplate(code, prenom),
+        text: `Votre code de vérification CERCLE : ${code}`
       };
 
       const result = await this.transporter.sendMail(mailOptions);
-      logger.info(`Verification email sent to ${email}`, { messageId: result.messageId });
+      logger.info(`✅ Verification email sent successfully to ${email}`, { 
+        messageId: result.messageId,
+        response: result.response 
+      });
       
       return {
         success: true,
         messageId: result.messageId
       };
     } catch (error) {
-      logger.error('Failed to send verification email:', error);
-      throw new Error('Failed to send verification email');
+      logger.error('❌ Failed to send verification email:', {
+        error: error.message,
+        code: error.code,
+        command: error.command,
+        to: email
+      });
+      throw new Error(`Failed to send verification email: ${error.message}`);
     }
   }
 
-  /**
-   * Template HTML pour l'email de vérification
-   */
   getVerificationEmailTemplate(code, prenom) {
     return `
     <!DOCTYPE html>
@@ -93,85 +88,55 @@ class EmailService {
           padding: 40px 30px; 
           text-align: center; 
         }
-        .header h1 {
-          margin: 0;
-          font-size: 28px;
-          font-weight: 600;
-        }
         .content { 
           padding: 40px 30px; 
         }
-        .code { 
-          background: linear-gradient(135deg, #f8f9ff 0%, #f0f2ff 100%); 
-          border: 2px dashed #667eea; 
-          border-radius: 12px; 
-          padding: 30px; 
+        .code-container { 
+          background: #f8f9fa; 
+          border: 2px solid #e9ecef; 
+          border-radius: 8px; 
+          padding: 20px; 
           text-align: center; 
           margin: 30px 0; 
         }
-        .code h2 { 
-          margin: 0; 
-          color: #667eea; 
-          font-size: 36px; 
+        .code { 
+          font-size: 32px; 
+          font-weight: bold; 
+          color: #495057; 
           letter-spacing: 8px; 
-          font-weight: 700;
+          font-family: 'Courier New', monospace; 
         }
         .footer { 
-          background: #f8f9fc; 
-          padding: 30px; 
+          background: #f8f9fa; 
+          padding: 20px; 
           text-align: center; 
-          color: #6b7280; 
-          font-size: 14px;
-        }
-        .warning {
-          background: #fef3cd;
-          border: 1px solid #ffeaa7;
-          color: #856404;
-          padding: 15px;
-          border-radius: 8px;
-          margin: 20px 0;
-        }
-        @media (max-width: 600px) {
-          .container { margin: 10px; }
-          .content, .header { padding: 20px; }
-          .code h2 { font-size: 28px; letter-spacing: 4px; }
+          color: #6c757d; 
+          font-size: 14px; 
         }
       </style>
     </head>
     <body>
       <div class="container">
         <div class="header">
-          <h1>🌟 Bienvenue sur CERCLE !</h1>
-          ${prenom ? `<p style="margin: 10px 0 0 0; font-size: 18px;">Salut ${prenom} !</p>` : ''}
+          <h1 style="margin: 0; font-size: 28px;">Bienvenue${prenom ? ' ' + prenom : ''} !</h1>
+          <p style="margin: 10px 0 0 0; opacity: 0.9;">Confirmez votre compte CERCLE</p>
         </div>
         
         <div class="content">
-          <h2 style="color: #1f2937; margin-bottom: 20px;">Confirmez votre adresse email</h2>
-          <p style="color: #4b5563; font-size: 16px;">
-            Nous sommes ravis de vous accueillir dans la communauté CERCLE ! 
-            Pour finaliser votre inscription et commencer à partager avec vos amis, 
-            veuillez saisir ce code de vérification :
+          <h2 style="color: #495057; margin-top: 0;">Code de vérification</h2>
+          <p style="color: #6b7280; font-size: 16px;">
+            Saisissez ce code dans l'application pour activer votre compte :
           </p>
           
-          <div class="code">
-            <p style="margin: 0 0 10px 0; color: #6b7280; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">Votre code de vérification</p>
-            <h2>${code}</h2>
-          </div>
-          
-          <div class="warning">
-            <strong>⏰ Important :</strong> Ce code expire dans <strong>15 minutes</strong>. 
-            Si vous ne l'utilisez pas dans ce délai, vous devrez en demander un nouveau.
+          <div class="code-container">
+            <div class="code">${code}</div>
+            <p style="margin: 10px 0 0 0; color: #6b7280; font-size: 14px;">
+              Ce code expire dans 15 minutes
+            </p>
           </div>
           
           <p style="color: #6b7280; font-size: 14px; margin-top: 30px;">
             Si vous n'avez pas créé de compte CERCLE, vous pouvez ignorer cet email en toute sécurité.
-          </p>
-          
-          <hr style="margin: 40px 0; border: none; border-top: 1px solid #e5e7eb;">
-          
-          <p style="color: #9ca3af; font-size: 13px;">
-            <strong>Problème ?</strong> Si vous rencontrez des difficultés, contactez notre équipe support. 
-            Nous sommes là pour vous aider !
           </p>
         </div>
         
@@ -185,23 +150,21 @@ class EmailService {
     `;
   }
 
-  /**
-   * Teste la configuration email
-   */
   async testConnection() {
     try {
+      logger.info('Testing email service connection...');
       await this.transporter.verify();
-      logger.info('Email service connection verified successfully');
+      logger.info('✅ Email service connection verified successfully');
       return true;
     } catch (error) {
-      logger.error('Email service connection failed:', error);
+      logger.error('❌ Email service connection failed:', {
+        error: error.message,
+        code: error.code
+      });
       return false;
     }
   }
 
-  /**
-   * Envoie un email de bienvenue après vérification
-   */
   async sendWelcomeEmail(email, prenom = '') {
     try {
       const mailOptions = {
@@ -223,13 +186,9 @@ class EmailService {
       };
     } catch (error) {
       logger.error('Failed to send welcome email:', error);
-      // Ne pas faire échouer le processus si l'email de bienvenue échoue
     }
   }
 
-  /**
-   * Template pour l'email de bienvenue
-   */
   getWelcomeEmailTemplate(prenom) {
     return `
     <!DOCTYPE html>
@@ -253,19 +212,26 @@ class EmailService {
         
         <div class="content">
           <h2>Prêt à découvrir CERCLE ?</h2>
-          <p>Votre email a été vérifié avec succès ! Vous pouvez maintenant :</p>
-          <ul>
-            <li>📝 Publier vos premiers messages</li>
-            <li>👥 Suivre d'autres utilisateurs</li>
-            <li>💬 Commencer des conversations</li>
-            <li>🔍 Découvrir du contenu intéressant</li>
-          </ul>
+          <p>Votre email a été vérifié avec succès ! Vous pouvez maintenant profiter de toutes les fonctionnalités de notre réseau social.</p>
           
-          <p>Nous avons hâte de voir ce que vous allez partager !</p>
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}" 
+               style="background: #10b981; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; display: inline-block; font-weight: bold;">
+              Commencer l'exploration
+            </a>
+          </div>
+          
+          <h3>Que pouvez-vous faire maintenant ?</h3>
+          <ul style="color: #666;">
+            <li>📝 Créer votre premier post</li>
+            <li>👥 Suivre d'autres utilisateurs</li>
+            <li>💬 Participer aux conversations</li>
+            <li>🎨 Personnaliser votre profil</li>
+          </ul>
         </div>
         
         <div class="footer">
-          <p>© 2025 CERCLE - Votre réseau social moderne</p>
+          <p>Merci de faire partie de la communauté CERCLE !</p>
         </div>
       </div>
     </body>

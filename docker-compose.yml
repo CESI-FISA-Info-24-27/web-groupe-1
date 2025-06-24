@@ -34,14 +34,45 @@ services:
       DATABASE_URL: ${DATABASE_URL}
       JWT_SECRET: ${JWT_SECRET}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN}
+      JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN}
       FRONTEND_URL: ${FRONTEND_URL}
+      BCRYPT_ROUNDS: ${BCRYPT_ROUNDS}
+      # 🔥 CREDENTIALS EMAIL HARDCODÉS - REMPLACEZ PAR VOS VRAIS CREDENTIALS
+      EMAIL_USER: "cercle.app.2025@gmail.com"
+      EMAIL_PASSWORD: "LeMot2PasseNePasOublier"
+      EMAIL_FROM: "noreply@cercle.com"
+      # Variables SMTP optionnelles
+      SMTP_HOST: ""
+      SMTP_PORT: ""
+      SMTP_SECURE: ""
+      SMTP_USER: ""
+      SMTP_PASSWORD: ""
+      # Rate limiting
+      RATE_LIMIT_WINDOW_MS: ${RATE_LIMIT_WINDOW_MS}
+      RATE_LIMIT_MAX_REQUESTS: ${RATE_LIMIT_MAX_REQUESTS}
+      AUTH_RATE_LIMIT_WINDOW_MS: ${AUTH_RATE_LIMIT_WINDOW_MS}
+      AUTH_RATE_LIMIT_MAX_REQUESTS: ${AUTH_RATE_LIMIT_MAX_REQUESTS}
+      EMAIL_RATE_LIMIT_WINDOW_MS: ${EMAIL_RATE_LIMIT_WINDOW_MS}
+      EMAIL_RATE_LIMIT_MAX_REQUESTS: ${EMAIL_RATE_LIMIT_MAX_REQUESTS}
+      # Logging
+      LOG_LEVEL: ${LOG_LEVEL}
+      # File upload
+      MAX_FILE_SIZE: ${MAX_FILE_SIZE}
+      ALLOWED_FILE_TYPES: ${ALLOWED_FILE_TYPES}
+      # Features
+      MAX_POST_LENGTH: ${MAX_POST_LENGTH}
+      MAX_MESSAGE_LENGTH: ${MAX_MESSAGE_LENGTH}
+      MAX_BIO_LENGTH: ${MAX_BIO_LENGTH}
+      DEFAULT_PAGE_SIZE: ${DEFAULT_PAGE_SIZE}
+      MAX_PAGE_SIZE: ${MAX_PAGE_SIZE}
     ports:
       - "${API_PORT}:${API_PORT}"
     depends_on:
       postgres:
         condition: service_healthy
     volumes:
-      # 🔥 VOLUME POUR HOT RELOAD - Monte le code source
+      # Volume pour hot reload - Monte le code source
       - ./backend:/app
       - /app/node_modules  # Évite d'écraser node_modules
     restart: unless-stopped
@@ -58,7 +89,7 @@ services:
     environment:
       NODE_ENV: ${NODE_ENV}
       VITE_API_BASE_URL: ${VITE_API_BASE_URL}
-      # 🔥 VARIABLES POUR HOT RELOAD WSL
+      # Variables pour hot reload WSL
       CHOKIDAR_USEPOLLING: "true"
       VITE_HMR_PORT: ${FRONTEND_PORT}
     ports:
@@ -66,42 +97,19 @@ services:
     depends_on:
       - backend
     volumes:
-      # 🔥 VOLUME POUR HOT RELOAD - Monte le code source
+      # Volume pour hot reload - Monte le code source
       - ./frontend:/app
       - /app/node_modules  # Évite d'écraser node_modules
     restart: unless-stopped
-    # 🔥 COMMANDE OPTIMISÉE POUR HOT RELOAD
+    # Commande optimisée pour hot reload
     command: npm run dev -- --host 0.0.0.0 --port ${FRONTEND_PORT}
     networks:
       - cercle_network
-
-  # # Serveur de fichiers MinIO (commenté pour le dev)
-  # minio:
-  #   image: minio/minio:latest
-  #   container_name: cercle-minio
-  #   ports:
-  #     - "${MINIO_API_PORT}:9000"
-  #     - "${MINIO_CONSOLE_PORT}:9001"
-  #   environment:
-  #     MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-  #     MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
-  #   command: server /data --console-address ":9001"
-  #   volumes:
-  #     - minio_data:/data
-  #   networks:
-  #     - cercle_network
-  #   healthcheck:
-  #     test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-  #     interval: 30s
-  #     timeout: 20s
-  #     retries: 3
 
 # Volumes pour la persistance
 volumes:
   postgres_data:
     driver: local
-  # minio_data:
-  #   driver: local
 
 # Réseau dédié
 networks:
