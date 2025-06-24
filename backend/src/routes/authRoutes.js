@@ -1,3 +1,4 @@
+// backend/src/routes/authRoutes.js
 const express = require('express');
 const rateLimit = require('express-rate-limit');
 const AuthController = require('../controllers/authController');
@@ -29,10 +30,26 @@ const registerLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// 🔥 NOUVEAU : Rate limiting pour la vérification email
+const verificationLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000, // 5 minutes
+  max: 3, // 3 tentatives de vérification par fenêtre
+  message: {
+    error: 'Too many verification attempts',
+    message: 'Please wait before requesting another code'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // Routes publiques
 router.post('/register', registerLimiter, AuthController.register);
 router.post('/login', authLimiter, AuthController.login);
 router.post('/refresh', AuthController.refresh);
+
+// 🔥 NOUVELLES ROUTES : Vérification email
+router.post('/verify-email', verificationLimiter, AuthController.verifyEmail);
+router.post('/resend-verification', verificationLimiter, AuthController.resendVerificationCode);
 
 // Routes protégées
 router.get('/me', authenticateToken, AuthController.me);

@@ -14,6 +14,7 @@
     "db:studio": "npx prisma studio",
     "db:generate": "npx prisma generate",
     "db:reset": "npx prisma migrate reset",
+    "db:seed": "npx prisma db seed",
     "lint": "eslint . --ext .js",
     "lint:fix": "eslint . --ext .js --fix",
     "format": "prettier --write .",
@@ -22,7 +23,8 @@
     "docker:run": "docker run -p 3000:3000 --env-file .env social-network-api",
     "docker:up": "docker-compose up -d",
     "docker:down": "docker-compose down",
-    "docker:logs": "docker-compose logs -f api"
+    "docker:logs": "docker-compose logs -f api",
+    "email:test": "node scripts/test-email.js"
   },
   "keywords": [
     "nodejs",
@@ -32,9 +34,11 @@
     "jwt",
     "api",
     "social-network",
-    "rest"
+    "rest",
+    "email",
+    "verification"
   ],
-  "author": "Votre Nom <votre.email@example.com>",
+  "author": "Équipe CERCLE <contact@cercle.com>",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -51,16 +55,18 @@
   "dependencies": {
     "@prisma/client": "^5.7.1",
     "bcrypt": "^5.1.1",
+    "bcryptjs": "^3.0.2",
     "compression": "^1.8.0",
     "cors": "^2.8.5",
-    "dotenv": "^16.3.1",
+    "dotenv": "^16.5.0",
     "express": "^4.18.2",
-    "express-rate-limit": "^7.1.5",
-    "helmet": "^7.1.0",
-    "joi": "^17.11.0",
+    "express-rate-limit": "^7.5.1",
+    "helmet": "^7.2.0",
+    "joi": "^17.13.3",
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0",
     "multer": "^1.4.5-lts.1",
+    "nodemailer": "^6.9.14",
     "pg": "^8.16.2",
     "winston": "^3.11.0"
   },
@@ -72,6 +78,7 @@
     "@types/morgan": "^1.9.9",
     "@types/multer": "^1.4.11",
     "@types/node": "^20.10.4",
+    "@types/nodemailer": "^6.4.15",
     "eslint": "^8.55.0",
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-node": "^11.1.0",
@@ -86,9 +93,13 @@
     "ignore": [
       "logs/*",
       "uploads/*",
-      "node_modules/*"
+      "node_modules/*",
+      "coverage/*"
     ],
-    "ext": "js,json"
+    "ext": "js,json",
+    "env": {
+      "NODE_ENV": "development"
+    }
   },
   "jest": {
     "testEnvironment": "node",
@@ -103,5 +114,8 @@
       "lcov",
       "html"
     ]
+  },
+  "prisma": {
+    "seed": "node prisma/seed.js"
   }
 }

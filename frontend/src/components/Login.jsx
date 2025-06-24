@@ -62,6 +62,18 @@ const Login = () => {
     } catch (error) {
       console.error('Erreur de connexion:', error)
       
+      // 🔥 NOUVEAU : Gestion de l'email non vérifié
+      if (error.requiresVerification) {
+        navigate('/verify-email', {
+          replace: true,
+          state: {
+            email: error.email,
+            message: 'Veuillez vérifier votre email avant de vous connecter.'
+          }
+        })
+        return
+      }
+      
       // ✅ AJOUT: Gestion spéciale pour les comptes bannis
       if (error.response?.data?.ban_info) {
         const banInfo = error.response.data.ban_info

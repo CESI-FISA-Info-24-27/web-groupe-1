@@ -11,6 +11,8 @@ COPY package*.json ./
 # Installer les dépendances
 RUN npm install
 RUN npm install pg
+RUN npm install nodemailer
+
 
 # Copier le code source
 COPY . .

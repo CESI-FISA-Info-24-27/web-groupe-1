@@ -3,7 +3,7 @@ import ApiService from './api';
 
 class AuthService {
   /**
-   * Inscription d'un nouvel utilisateur (ne connecte pas automatiquement)
+   * Inscription d'un nouvel utilisateur (modifiée pour la vérification)
    */
   async register(userData) {
     try {
@@ -19,7 +19,7 @@ class AuthService {
   }
 
   /**
-   * Vérification de l'email avec le code reçu
+   * 🔥 NOUVEAU : Vérification de l'email avec le code reçu
    */
   async verifyEmail(email, code) {
     try {
@@ -42,7 +42,7 @@ class AuthService {
   }
 
   /**
-   * Renvoyer un code de vérification
+   * 🔥 NOUVEAU : Renvoyer un code de vérification
    */
   async resendVerificationCode(email) {
     try {
@@ -57,7 +57,7 @@ class AuthService {
   }
 
   /**
-   * Connexion d'un utilisateur
+   * Connexion d'un utilisateur (modifiée pour gérer la vérification)
    */
   async login(credentials) {
     try {
@@ -99,27 +99,37 @@ class AuthService {
   }
 
   /**
-   * Obtenir les informations de l'utilisateur connecté
+   * Rafraîchir le token d'accès
    */
-  async getCurrentUser() {
+  async refreshToken() {
     try {
-      const response = await ApiService.get('/api/v1/auth/me');
-      localStorage.setItem('user', JSON.stringify(response.user || response));
-      return response.user || response;
+      const refreshToken = localStorage.getItem('refreshToken');
+      if (!refreshToken) {
+        throw new Error('No refresh token available');
+      }
+
+      const response = await ApiService.post('/api/v1/auth/refresh', {
+        refreshToken
+      });
+
+      localStorage.setItem('accessToken', response.accessToken);
+      return response.accessToken;
     } catch (error) {
+      this.clearStorage();
       throw error;
     }
   }
 
   /**
-   * Changer le mot de passe
+   * Obtenir les informations de l'utilisateur connecté
    */
-  async changePassword(passwordData) {
+  async getCurrentUser() {
     try {
-      const response = await ApiService.post('/api/v1/auth/change-password', passwordData);
-      return response;
+      const response = await ApiService.get('/api/v1/auth/me');
+      localStorage.setItem('user', JSON.stringify(response.user));
+      return response.user;
     } catch (error) {
-      throw this.handleAuthError(error);
+      throw error;
     }
   }
 
@@ -146,38 +156,6 @@ class AuthService {
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('user');
-  }
-
-  /**
-   * Obtenir le token d'accès
-   */
-  getAccessToken() {
-    return localStorage.getItem('accessToken');
-  }
-
-  /**
-   * Obtenir le refresh token
-   */
-  getRefreshToken() {
-    return localStorage.getItem('refreshToken');
-  }
-
-  /**
-   * Vérifier la validité du token (côté client)
-   */
-  isTokenExpired() {
-    const token = this.getAccessToken();
-    if (!token) return true;
-
-    try {
-      // Décoder le JWT pour vérifier l'expiration
-      const payload = JSON.parse(atob(token.split('.')[1]));
-      const currentTime = Math.floor(Date.now() / 1000);
-      return payload.exp < currentTime;
-    } catch (error) {
-      // Si on ne peut pas décoder le token, on considère qu'il est expiré
-      return true;
-    }
   }
 
   /**
@@ -215,11 +193,6 @@ class AuthService {
 
     if (message.includes('Too many attempts')) {
       return new Error('Trop de tentatives. Demandez un nouveau code.');
-    }
-
-    if (message.includes('Token expired') || message.includes('Invalid token')) {
-      this.clearStorage();
-      return new Error('Session expirée. Veuillez vous reconnecter.');
     }
     
     return new Error(message);
