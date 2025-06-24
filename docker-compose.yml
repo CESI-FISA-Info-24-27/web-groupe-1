@@ -40,7 +40,7 @@ services:
       BCRYPT_ROUNDS: ${BCRYPT_ROUNDS}
       # 🔥 CREDENTIALS EMAIL HARDCODÉS - REMPLACEZ PAR VOS VRAIS CREDENTIALS
       EMAIL_USER: "cercle.app.2025@gmail.com"
-      EMAIL_PASSWORD: "LeMot2PasseNePasOublier"
+      EMAIL_PASSWORD: "vgap nzic hhvj nati"
       EMAIL_FROM: "noreply@cercle.com"
       # Variables SMTP optionnelles
       SMTP_HOST: ""
