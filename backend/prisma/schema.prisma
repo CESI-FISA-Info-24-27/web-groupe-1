@@ -1,4 +1,4 @@
-// backend/prisma/schema.prisma - VOTRE SCHÉMA ORIGINAL + vérification email
+// backend/prisma/schema.prisma
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
@@ -101,8 +101,6 @@ model User {
   created_at    DateTime
   updated_at    DateTime
   last_login    DateTime?
-  
-  // 🔥 NOUVEAUX CHAMPS : Vérification email (ajoutés à votre schéma)
   email_verified              Boolean   @default(false)
   verification_code           String?   @db.VarChar(6)
   verification_code_expires_at DateTime?

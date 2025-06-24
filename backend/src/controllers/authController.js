@@ -456,7 +456,7 @@ class AuthController {
         },
         include: {
           role: true,
-          userPreferences: {
+          user_preferences: {
             include: {
               langue: true,
               theme: true
