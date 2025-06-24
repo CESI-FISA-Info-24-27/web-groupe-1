@@ -20,59 +20,65 @@ services:
     networks:
       - cercle_network
 
-  # # Serveur de fichiers MinIO
-  # minio:
-  #   image: minio/minio:latest
-  #   container_name: cercle-minio
-  #   ports:
-  #     - "${MINIO_API_PORT}:9000"          # API
-  #     - "${MINIO_CONSOLE_PORT}:9001"      # Console
-  #   environment:
-  #     MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-  #     MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
-  #   command: server /data --console-address ":9001"
-  #   volumes:
-  #     - minio_data:/data
-  #   networks:
-  #     - cercle_network
-  #   healthcheck:
-  #     test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-  #     interval: 30s
-  #     timeout: 20s
-  #     retries: 3
+  # Serveur de fichiers MinIO
+  minio:
+    image: minio/minio:latest
+    container_name: cercle-minio
+    ports:
+      - "${MINIO_API_PORT}:9000"          # API
+      - "${MINIO_CONSOLE_PORT}:9001"      # Console
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - cercle_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
 
-  # # Service pour créer les buckets automatiquement
-  # minio-create-buckets:
-  #   image: minio/mc:latest
-  #   container_name: cercle-minio-setup
-  #   depends_on:
-  #     minio:
-  #       condition: service_healthy
-  #   environment:
-  #     MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-  #     MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
-  #     MINIO_DEFAULT_BUCKETS: ${MINIO_DEFAULT_BUCKETS}
-  #   networks:
-  #     - cercle_network
-  #   entrypoint: >
-  #     /bin/sh -c "
-  #     echo 'Attente de MinIO...';
-  #     until mc alias set myminio http://minio:9000 \$$MINIO_ROOT_USER \$$MINIO_ROOT_PASSWORD; do
-  #       echo 'MinIO non disponible, nouvelle tentative dans 5 secondes...';
-  #       sleep 5;
-  #     done;
-  #     echo 'MinIO disponible, création des buckets...';
-  #     for bucket in \$$(echo \$$MINIO_DEFAULT_BUCKETS | tr ',' ' '); do
-  #       if ! mc ls myminio/\$$bucket > /dev/null 2>&1; then
-  #         echo \"Création du bucket: \$$bucket\";
-  #         mc mb myminio/\$$bucket;
-  #       else
-  #         echo \"Le bucket \$$bucket existe déjà\";
-  #       fi;
-  #     done;
-  #     echo 'Configuration terminée';
-  #     "
-  #   restart: "no"
+  # Service pour créer les buckets automatiquement
+  minio-create-buckets:
+    image: minio/mc:latest
+    container_name: cercle-minio-setup
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_DEFAULT_BUCKETS: ${MINIO_DEFAULT_BUCKETS}
+    networks:
+      - cercle_network
+    entrypoint: >
+      /bin/sh -c "
+      echo 'Attente de MinIO...';
+      until mc alias set myminio http://minio:9000 \$$MINIO_ROOT_USER \$$MINIO_ROOT_PASSWORD; do
+        echo 'MinIO non disponible, nouvelle tentative dans 5 secondes...';
+        sleep 5;
+      done;
+      echo 'MinIO disponible, création des buckets...';
+      for bucket in \$$(echo \$$MINIO_DEFAULT_BUCKETS | tr ',' ' '); do
+        if ! mc ls myminio/\$$bucket > /dev/null 2>&1; then
+          echo \"Création du bucket: \$$bucket\";
+          mc mb myminio/\$$bucket;
+          
+          # Définir une politique publique pour avatars et images
+          if [ \$$bucket = 'avatars' ] || [ \$$bucket = 'images' ]; then
+            echo \"Définition de la politique publique pour \$$bucket\";
+            mc anonymous set public myminio/\$$bucket;
+          fi
+        else
+          echo \"Le bucket \$$bucket existe déjà\";
+        fi;
+      done;
+      echo 'Configuration des buckets terminée';
+      "
+    restart: "no"
 
   # Backend API
   backend:
@@ -106,16 +112,24 @@ services:
       EMAIL_RATE_LIMIT_MAX_REQUESTS: ${EMAIL_RATE_LIMIT_MAX_REQUESTS}
       LOG_LEVEL: ${LOG_LEVEL}
       MAX_FILE_SIZE: ${MAX_FILE_SIZE}
+      MAX_VIDEO_SIZE: ${MAX_VIDEO_SIZE}
       ALLOWED_FILE_TYPES: ${ALLOWED_FILE_TYPES}
       MAX_POST_LENGTH: ${MAX_POST_LENGTH}
       MAX_MESSAGE_LENGTH: ${MAX_MESSAGE_LENGTH}
       MAX_BIO_LENGTH: ${MAX_BIO_LENGTH}
       DEFAULT_PAGE_SIZE: ${DEFAULT_PAGE_SIZE}
       MAX_PAGE_SIZE: ${MAX_PAGE_SIZE}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_ENDPOINT: minio
+      MINIO_API_PORT: ${MINIO_API_PORT}
+      MINIO_USE_SSL: "false"
     ports:
       - "${API_PORT}:${API_PORT}"
     depends_on:
       postgres:
+        condition: service_healthy
+      minio:
         condition: service_healthy
     volumes:
       - ./backend:/app
@@ -136,6 +150,9 @@ services:
       VITE_API_BASE_URL: ${VITE_API_BASE_URL}
       CHOKIDAR_USEPOLLING: "true"
       VITE_HMR_PORT: ${FRONTEND_PORT}
+      VITE_AVATAR_BASE_URL: ${AVATAR_BASE_URL}
+      VITE_IMAGE_BASE_URL: ${IMAGE_BASE_URL}
+      VITE_VIDEO_BASE_URL: ${VIDEO_BASE_URL}
     ports:
       - "${FRONTEND_PORT}:${FRONTEND_PORT}"
     depends_on:

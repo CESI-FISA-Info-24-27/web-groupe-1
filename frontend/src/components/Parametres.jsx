@@ -1,18 +1,24 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useNavigate } from 'react-router-dom'
-import { useTheme } from '../context/ThemeContext' // ✅ Ajout du hook theme
+import { useTheme } from '../context/ThemeContext'
 import LeftSidebar from './LeftSidebar'
+import AvatarUpload from './AvatarUpload' // ✅ Nouveau composant MinIO
+import { mediaService } from '../services/mediaService' // ✅ Service MinIO
 
 const Parametres = () => {
   const { user, logout, updateUser } = useAuth()
   const navigate = useNavigate()
-  const { isDarkMode, toggleTheme, isInitialized } = useTheme() // ✅ Ajout isInitialized
+  const { isDarkMode, toggleTheme, isInitialized } = useTheme()
   const [isEditing, setIsEditing] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [showMobileMenu, setShowMobileMenu] = useState(false)
+  
+  // ✅ NOUVEAU : États pour les statistiques MinIO
+  const [storageStats, setStorageStats] = useState(null)
+  const [loadingStats, setLoadingStats] = useState(false)
   
   // Form data
   const [formData, setFormData] = useState({
@@ -29,7 +35,7 @@ const Parametres = () => {
   // Initialize form data from user
   useEffect(() => {
     if (user) {
-      console.log('Current user data:', user) // Debug pour voir les données
+      console.log('Current user data:', user)
       setFormData({
         prenom: user.prenom || '',
         nom: user.nom || '',
@@ -37,11 +43,28 @@ const Parametres = () => {
         mail: user.mail || '',
         bio: user.bio || '',
         date_naissance: user.date_naissance ? user.date_naissance.split('T')[0] : '',
-        telephone: user.telephone || '', // S'assurer que le téléphone est bien récupéré
+        telephone: user.telephone || '',
         private: user.private || false
       })
     }
   }, [user])
+
+  // ✅ NOUVEAU : Charger les statistiques de stockage
+  useEffect(() => {
+    loadStorageStats()
+  }, [])
+
+  const loadStorageStats = async () => {
+    try {
+      setLoadingStats(true)
+      const stats = await mediaService.getStorageStats()
+      setStorageStats(stats)
+    } catch (error) {
+      console.warn('Impossible de charger les statistiques de stockage:', error)
+    } finally {
+      setLoadingStats(false)
+    }
+  }
 
   // Fonction pour rafraîchir les données utilisateur depuis l'API
   const refreshUserData = async () => {
@@ -58,18 +81,13 @@ const Parametres = () => {
 
       if (response.ok) {
         const userData = await response.json()
-        console.log('Refreshed user data:', userData) // Debug
+        console.log('Refreshed user data:', userData)
         updateUser(userData)
       }
     } catch (error) {
       console.error('Error refreshing user data:', error)
     }
   }
-
-  // Rafraîchir les données au chargement du composant
-  useEffect(() => {
-    // refreshUserData()
-  }, [])
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target
@@ -107,9 +125,6 @@ const Parametres = () => {
         updateUser(updatedUser)
         setSuccess('Profil mis à jour avec succès !')
         setIsEditing(false)
-        
-        // Rafraîchir les données pour être sûr
-        // await refreshUserData()
       } else {
         const errorData = await response.json()
         setError(errorData.message || 'Erreur lors de la mise à jour')
@@ -141,19 +156,26 @@ const Parametres = () => {
     setSuccess('')
   }
 
+  // ✅ NOUVEAU : Gestionnaire de changement d'avatar
+  const handleAvatarChange = (newAvatarUrl) => {
+    updateUser({
+      ...user,
+      photo_profil: newAvatarUrl
+    })
+    setSuccess('Photo de profil mise à jour !')
+    loadStorageStats() // Recharger les stats
+  }
+
   const handleChangePassword = () => {
-    // TODO: Implement password change
     alert('Changement de mot de passe à implémenter')
   }
 
   const handleDelete2FA = () => {
-    // TODO: Implement 2FA management
     alert('Gestion 2FA à implémenter')
   }
 
   const handleDeleteAccount = () => {
     if (window.confirm('Êtes-vous sûr de vouloir supprimer votre compte ? Cette action est irréversible.')) {
-      // TODO: Implement account deletion
       alert('Suppression de compte à implémenter')
     }
   }
@@ -164,6 +186,15 @@ const Parametres = () => {
       return `${user.prenom[0]}${user.nom[0]}`.toUpperCase()
     }
     return user.username?.[0]?.toUpperCase() || 'U'
+  }
+
+  // ✅ NOUVEAU : Fonction pour formater la taille des fichiers
+  const formatFileSize = (bytes) => {
+    if (!bytes) return '0 B'
+    const k = 1024
+    const sizes = ['B', 'KB', 'MB', 'GB']
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
   }
 
   return (
@@ -290,31 +321,73 @@ const Parametres = () => {
                   <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Photo de profil</h2>
                   
                   <div className="text-center space-y-4">
-                    <div className="w-24 h-24 mx-auto rounded-full overflow-hidden border-4 border-gray-100 dark:border-gray-700">
-                      {user?.photo_profil ? (
-                        <img src={user.photo_profil} alt="Profile" className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-                          <span className="text-white text-xl font-bold">{getInitials(user)}</span>
-                        </div>
-                      )}
-                    </div>
+                    {/* ✅ REMPLACÉ : Utiliser le nouveau composant AvatarUpload */}
+                    <AvatarUpload
+                      currentAvatar={user?.photo_profil}
+                      onAvatarChange={handleAvatarChange}
+                      className="mx-auto"
+                    />
                     
-                    <div>
-                      <button className="bg-black dark:bg-white text-white dark:text-black px-4 py-2 rounded-lg hover:bg-gray-800 dark:hover:bg-gray-200 transition-colors text-sm font-medium">
-                        Changer la photo
-                      </button>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">JPG, PNG ou GIF. Max 5MB.</p>
-                    </div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-4">
+                      JPG, PNG ou WebP. Maximum 5MB.<br/>
+                      L'image sera automatiquement redimensionnée.
+                    </p>
                   </div>
                 </div>
+
+                {/* ✅ NOUVEAU : Section Statistiques de stockage */}
+                {storageStats && (
+                  <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 mt-6 transition-colors duration-200">
+                    <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Stockage utilisé</h2>
+                    
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600 dark:text-gray-400">Avatars</span>
+                        <span className="text-sm font-medium">
+                          {storageStats.storage.avatars.count} - {formatFileSize(storageStats.storage.avatars.size)}
+                        </span>
+                      </div>
+                      
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600 dark:text-gray-400">Images</span>
+                        <span className="text-sm font-medium">
+                          {storageStats.storage.images.count} - {formatFileSize(storageStats.storage.images.size)}
+                        </span>
+                      </div>
+                      
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600 dark:text-gray-400">Vidéos</span>
+                        <span className="text-sm font-medium">
+                          {storageStats.storage.videos.count} - {formatFileSize(storageStats.storage.videos.size)}
+                        </span>
+                      </div>
+                      
+                      <hr className="border-gray-200 dark:border-gray-700" />
+                      
+                      <div className="flex justify-between items-center font-semibold">
+                        <span className="text-sm">Total</span>
+                        <span className="text-sm">
+                          {storageStats.storage.total.count} - {formatFileSize(storageStats.storage.total.size)}
+                        </span>
+                      </div>
+                    </div>
+                    
+                    <button
+                      onClick={loadStorageStats}
+                      disabled={loadingStats}
+                      className="w-full mt-4 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 px-3 py-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-sm"
+                    >
+                      {loadingStats ? 'Actualisation...' : 'Actualiser'}
+                    </button>
+                  </div>
+                )}
                 
-                {/* Section Préférences - ✅ BOUTON MODE DARK FONCTIONNEL */}
+                {/* Section Préférences */}
                 <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 mt-6 transition-colors duration-200">
                   <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Préférences</h2>
                   
                   <div className="space-y-3">
-                    {/* Mode sombre - ✅ BOUTON FONCTIONNEL AVEC DEBUG */}
+                    {/* Mode sombre */}
                     <div className="flex items-center justify-between py-2">
                       <div>
                         <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Mode sombre</p>

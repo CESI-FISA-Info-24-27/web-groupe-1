@@ -14,11 +14,14 @@ const likeRoutes = require('./src/routes/likeRoutes');
 const followRoutes = require('./src/routes/followRoutes');
 const messageRoutes = require('./src/routes/messageRoutes');
 const adminRoutes = require('./src/routes/adminRoutes');
+const mediaRoutes = require('./src/routes/mediaRoutes');
 
 // Import des middlewares
 const { authenticateToken } = require('./src/middleware/auth');
 const errorHandler = require('./src/middleware/errorHandler');
 const logger = require('./src/utils/logger');
+
+const { initializeMinIO } = require('./src/config/minio');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -120,6 +123,8 @@ app.use('/api/v1/likes', authenticateToken, likeRoutes);
 app.use('/api/v1/follow', authenticateToken, followRoutes);
 app.use('/api/v1/messages', authenticateToken, messageRoutes);
 
+app.use('/api/v1/media', authenticateToken, mediaRoutes);
+
 // 3. ✅ CORRECTION ADMIN : Pas de double authentification
 // adminRoutes.js contient déjà router.use(authenticateToken)
 app.use('/api/v1/admin', adminRoutes);
@@ -130,13 +135,26 @@ app.get('/health', async (req, res) => {
     const db = require('./src/utils/database');
     await db.user.count();
     
+    let minioStatus = 'not configured';
+    if (process.env.MINIO_ROOT_USER && process.env.MINIO_ROOT_PASSWORD) {
+      try {
+        const { minioClient } = require('./src/config/minio');
+        await minioClient.listBuckets();
+        minioStatus = 'connected';
+      } catch (error) {
+        minioStatus = 'error';
+        logger.warn('MinIO health check failed:', error.message);
+      }
+    }
+    
     res.json({ 
       status: 'OK', 
       timestamp: new Date().toISOString(),
       version: '1.0.0',
       uptime: process.uptime(),
       environment: process.env.NODE_ENV || 'development',
-      database: 'connected'
+      database: 'connected',
+      storage: minioStatus // 📁 NOUVEAU
     });
   } catch (error) {
     logger.error('Health check failed:', error);
@@ -144,7 +162,8 @@ app.get('/health', async (req, res) => {
       status: 'ERROR',
       timestamp: new Date().toISOString(),
       error: 'Health check failed',
-      database: 'disconnected'
+      database: 'disconnected',
+      storage: 'unknown' // 📁 NOUVEAU
     });
   }
 });
@@ -162,7 +181,8 @@ app.get('/', (req, res) => {
       'Private messaging',
       'Admin backoffice',
       'Rate limiting',
-      'File uploads'
+      'File uploads',
+      'Media storage (MinIO)' // 📁 NOUVEAU
     ],
     endpoints: {
       auth: '/api/v1/auth',
@@ -171,7 +191,8 @@ app.get('/', (req, res) => {
       likes: '/api/v1/likes',
       follow: '/api/v1/follow',
       messages: '/api/v1/messages',
-      admin: '/api/v1/admin'
+      admin: '/api/v1/admin',
+      media: '/api/v1/media' // 📁 NOUVEAU
     }
   });
 });
@@ -187,6 +208,7 @@ app.use('*', (req, res) => {
       'POST /api/v1/auth/login',
       'POST /api/v1/auth/register',
       'GET /api/v1/posts/public',
+      'POST /api/v1/media/avatar (authenticated)', // 📁 NOUVEAU
       'GET /api/v1/admin/dashboard (admin only)'
     ]
   });
@@ -207,6 +229,29 @@ const testDatabaseConnection = async () => {
   } catch (error) {
     logger.error('❌ Database connection failed:', error);
     process.exit(1);
+  }
+};
+
+// 📁 NOUVEAU : Test de connexion MinIO
+const testMinIOConnection = async () => {
+  try {
+    if (process.env.MINIO_ROOT_USER && process.env.MINIO_ROOT_PASSWORD) {
+      logger.info('🔄 Initializing MinIO file storage...');
+      await initializeMinIO();
+      logger.info('✅ MinIO connected successfully');
+      
+      // Afficher les URLs d'accès
+      const minioPort = process.env.MINIO_CONSOLE_PORT || 9001;
+      logger.info(`📁 MinIO Console: http://localhost:${minioPort}`);
+      logger.info(`🔑 MinIO Credentials: ${process.env.MINIO_ROOT_USER} / ${process.env.MINIO_ROOT_PASSWORD}`);
+    } else {
+      logger.warn('⚠️  MinIO not configured - file storage disabled');
+      logger.info('💡 To enable file storage, set MINIO_ROOT_USER and MINIO_ROOT_PASSWORD in .env');
+    }
+  } catch (error) {
+    logger.error('❌ MinIO connection failed:', error);
+    logger.warn('📁 File storage will be disabled');
+    // Ne pas faire crash l'app si MinIO n'est pas disponible
   }
 };
 
@@ -232,27 +277,53 @@ process.on('SIGTERM', async () => {
   process.exit(0);
 });
 
-// Démarrage du serveur
-app.listen(PORT, async () => {
-  logger.info(`🚀 Server running on port ${PORT}`);
-  logger.info(`📱 Frontend URL: ${process.env.FRONTEND_URL || 'http://localhost:5173'}`);
-  logger.info(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
-  logger.info(`🔗 API URL: http://localhost:${PORT}`);
-  
-  if (process.env.NODE_ENV === 'production') {
-    logger.info(`🔒 Rate limiting: ENABLED`);
-  } else {
-    logger.info(`🔓 Rate limiting: DISABLED (development mode)`);
+// 📁 FONCTION DE DÉMARRAGE MISE À JOUR
+const startServer = async () => {
+  try {
+    // Tester la base de données en premier
+    await testDatabaseConnection();
+    
+    // Tester MinIO (non bloquant)
+    await testMinIOConnection();
+    
+    // Démarrer le serveur
+    app.listen(PORT, () => {
+      logger.info(`🚀 Server running on port ${PORT}`);
+      logger.info(`📱 Frontend URL: ${process.env.FRONTEND_URL || 'http://localhost:5173'}`);
+      logger.info(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+      logger.info(`🔗 API URL: http://localhost:${PORT}`);
+      
+      if (process.env.NODE_ENV === 'production') {
+        logger.info(`🔒 Rate limiting: ENABLED`);
+      } else {
+        logger.info(`🔓 Rate limiting: DISABLED (development mode)`);
+      }
+      
+      logger.info(`✨ Features enabled:`);
+      logger.info(`   - User authentication & roles`);
+      logger.info(`   - Admin backoffice system`);
+      logger.info(`   - Posts, likes & comments`);
+      logger.info(`   - Follow & messaging system`);
+      logger.info(`   - Intelligent rate limiting`);
+      
+      // 📁 NOUVEAU : Affichage conditionnel des fonctionnalités de stockage
+      if (process.env.MINIO_ROOT_USER) {
+        logger.info(`   - File storage (MinIO)`);
+        logger.info(`   - Avatar & media uploads`);
+      } else {
+        logger.info(`   - File storage: DISABLED`);
+      }
+      
+      logger.info(`🎯 Server ready to accept connections!`);
+    });
+    
+  } catch (error) {
+    logger.error('❌ Failed to start server:', error);
+    process.exit(1);
   }
-  
-  logger.info(`✨ Features enabled:`);
-  logger.info(`   - User authentication & roles`);
-  logger.info(`   - Admin backoffice system`);
-  logger.info(`   - Posts, likes & comments`);
-  logger.info(`   - Follow & messaging system`);
-  logger.info(`   - Intelligent rate limiting`);
-  
-  await testDatabaseConnection();
-});
+};
+
+// 📁 DÉMARRAGE AVEC GESTION ASYNC
+startServer();
 
 module.exports = app;

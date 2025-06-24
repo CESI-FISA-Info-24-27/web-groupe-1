@@ -1,7 +1,7 @@
 {
   "name": "social-network-api",
   "version": "1.0.0",
-  "description": "API REST pour réseau social moderne développée avec Node.js, Express et PostgreSQL",
+  "description": "API REST pour réseau social moderne avec stockage MinIO",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -14,7 +14,6 @@
     "db:studio": "npx prisma studio",
     "db:generate": "npx prisma generate",
     "db:reset": "npx prisma migrate reset",
-    "db:seed": "npx prisma db seed",
     "lint": "eslint . --ext .js",
     "lint:fix": "eslint . --ext .js --fix",
     "format": "prettier --write .",
@@ -29,14 +28,16 @@
   "keywords": [
     "nodejs",
     "express",
-    "postgresql",
+    "postgresql", 
     "prisma",
     "jwt",
     "api",
     "social-network",
     "rest",
     "email",
-    "verification"
+    "verification",
+    "minio",
+    "file-storage"
   ],
   "author": "Équipe CERCLE <contact@cercle.com>",
   "license": "MIT",
@@ -64,10 +65,12 @@
     "helmet": "^7.2.0",
     "joi": "^17.13.3",
     "jsonwebtoken": "^9.0.2",
+    "minio": "^8.0.3",
     "morgan": "^1.10.0",
     "multer": "^1.4.5-lts.1",
     "nodemailer": "^6.9.14",
     "pg": "^8.16.2",
+    "sharp": "^0.33.5",
     "winston": "^3.11.0"
   },
   "devDependencies": {
@@ -92,7 +95,7 @@
   "nodemonConfig": {
     "ignore": [
       "logs/*",
-      "uploads/*",
+      "uploads/*", 
       "node_modules/*",
       "coverage/*"
     ],

@@ -12,7 +12,7 @@ COPY package*.json ./
 RUN npm install
 RUN npm install pg
 RUN npm install nodemailer
-
+RUN npm install minio sharp
 
 # Copier le code source
 COPY . .
