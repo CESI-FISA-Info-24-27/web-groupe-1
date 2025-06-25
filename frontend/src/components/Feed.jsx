@@ -226,7 +226,7 @@ const Feed = () => {
 
     try {
       const token = localStorage.getItem('accessToken');
-      const response = await fetch(`/api/v1/posts/${postId}/comments`, {
+      const response = await fetch(`/api/v1/posts/${postId}/reply`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
