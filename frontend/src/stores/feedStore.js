@@ -10,9 +10,10 @@ const useFeedStore = create(
       error: null,
       pagination: {
         page: 1,
-        limit: 20,
+        limit: 50, // ✅ MODIFIÉ: Augmenté de 20 à 50 tweets par page
         hasNext: false,
-        total: 0
+        total: 0,
+        maxPosts: 200 // ✅ NOUVEAU: Limite maximale de posts en mémoire
       },
       pendingLikes: new Set(),
       feedFilter: 'recent', // 'recent', 'friends', 'popular'
@@ -20,13 +21,20 @@ const useFeedStore = create(
       // Actions pour les posts
       setPosts: (posts) => set({ posts }),
       
-      addPosts: (newPosts) => set((state) => ({
-        posts: [...state.posts, ...newPosts]
-      })),
+      // ✅ MODIFIÉ: Limiter le nombre total de posts
+      addPosts: (newPosts) => set((state) => {
+        const allPosts = [...state.posts, ...newPosts];
+        // Garder seulement les 200 derniers posts
+        const limitedPosts = allPosts.slice(0, state.pagination.maxPosts);
+        return { posts: limitedPosts };
+      }),
       
-      prependPost: (post) => set((state) => ({
-        posts: [post, ...state.posts]
-      })),
+      prependPost: (post) => set((state) => {
+        const newPosts = [post, ...state.posts];
+        // Garder seulement les 200 derniers posts
+        const limitedPosts = newPosts.slice(0, state.pagination.maxPosts);
+        return { posts: limitedPosts };
+      }),
 
       setLoading: (isLoading) => set({ isLoading }),
       
@@ -171,9 +179,18 @@ const useFeedStore = create(
         })
       })),
 
-      // ✅ CHARGER LES POSTS AVEC GESTION 401
+      // ✅ CHARGER LES POSTS AVEC GESTION 401 ET LIMITE AUGMENTÉE
       fetchPosts: async (reset = false, page = 1) => {
-        const { setLoading, setError, setPosts, addPosts, setPagination, feedFilter, authenticatedFetch } = get();
+        const { 
+          setLoading, 
+          setError, 
+          setPosts, 
+          addPosts, 
+          setPagination, 
+          feedFilter, 
+          authenticatedFetch,
+          pagination 
+        } = get();
         
         setLoading(true);
         setError(null);
@@ -190,7 +207,8 @@ const useFeedStore = create(
           
           console.log(`🔍 Fetching from: ${endpoint} (filter: ${feedFilter})`);
           
-          const response = await authenticatedFetch(`${endpoint}?page=${page}&limit=20`);
+          // ✅ MODIFIÉ: Utiliser la nouvelle limite de 50 au lieu de 20
+          const response = await authenticatedFetch(`${endpoint}?page=${page}&limit=${pagination.limit}`);
 
           if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
@@ -204,6 +222,8 @@ const useFeedStore = create(
           console.log(`✅ Posts récupérés:`, {
             count: newPosts.length,
             endpoint,
+            totalInMemory: reset ? newPosts.length : get().posts.length + newPosts.length,
+            maxAllowed: pagination.maxPosts,
             posts: newPosts.map(p => ({
               id: p.id_post,
               author: p.author?.username,
@@ -214,15 +234,25 @@ const useFeedStore = create(
           if (reset) {
             setPosts(newPosts);
           } else {
+            // ✅ addPosts va automatiquement limiter à 200 posts
             addPosts(newPosts);
           }
 
+          // ✅ MODIFIÉ: Arrêter le chargement si on atteint 200 posts
+          const currentPostCount = reset ? newPosts.length : get().posts.length;
+          const shouldStopLoading = currentPostCount >= pagination.maxPosts;
+
           setPagination({
             page: data.pagination?.page || page,
-            limit: data.pagination?.limit || 20,
-            hasNext: data.pagination?.hasNext || false,
-            total: data.pagination?.total || 0
+            limit: data.pagination?.limit || pagination.limit,
+            hasNext: (data.pagination?.hasNext || false) && !shouldStopLoading,
+            total: Math.min(data.pagination?.total || 0, pagination.maxPosts)
           });
+
+          // ✅ Message informatif quand on atteint la limite
+          if (shouldStopLoading && currentPostCount >= pagination.maxPosts) {
+            console.log(`📊 Limite de ${pagination.maxPosts} posts atteinte. Arrêt du chargement.`);
+          }
 
         } catch (error) {
           console.error('❌ Erreur chargement posts:', error);
@@ -253,7 +283,7 @@ const useFeedStore = create(
           }
 
           const data = await response.json();
-          prependPost(data.post);
+          prependPost(data.post); // ✅ prependPost va automatiquement limiter à 200
           
           console.log('✅ Post créé avec succès');
           return { success: true, post: data.post };
@@ -316,7 +346,7 @@ const useFeedStore = create(
         posts: [],
         isLoading: false,
         error: null,
-        pagination: { page: 1, limit: 20, hasNext: false, total: 0 },
+        pagination: { page: 1, limit: 50, hasNext: false, total: 0, maxPosts: 200 }, // ✅ MODIFIÉ
         pendingLikes: new Set(),
         feedFilter: 'recent'
       })
@@ -328,7 +358,7 @@ const useFeedStore = create(
         posts: state.posts,
         feedFilter: state.feedFilter,
       }),
-      version: 1,
+      version: 2, // ✅ MODIFIÉ: Incrémenté pour forcer la migration
     }
   )
 );
