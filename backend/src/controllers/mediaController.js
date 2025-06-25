@@ -158,6 +158,49 @@ class MediaController {
   }
 
   /**
+   * Supprimer l'avatar d'un utilisateur
+   */
+  static async deleteAvatar(req, res) {
+    try {
+      const userId = req.user.id_user;
+
+      // Récupérer l'utilisateur avec son avatar actuel
+      const user = await prisma.user.findUnique({
+        where: { id_user: userId },
+        select: { photo_profil: true }
+      });
+
+      if (!user || !user.photo_profil) {
+        return res.status(400).json({ error: 'Aucun avatar à supprimer' });
+      }
+
+      // Supprimer le fichier de MinIO
+      try {
+        const urlParts = user.photo_profil.split('/');
+        const fileName = urlParts.slice(-2).join('/'); // userId/filename
+        await minioClient.removeObject(BUCKETS.AVATARS, fileName);
+      } catch (minioError) {
+        logger.warn(`Impossible de supprimer l'avatar de MinIO:`, minioError);
+      }
+
+      // Mettre à jour la base de données
+      await prisma.user.update({
+        where: { id_user: userId },
+        data: { 
+          photo_profil: null,
+          updated_at: new Date()
+        }
+      });
+
+      res.json({ message: 'Avatar supprimé avec succès' });
+
+    } catch (error) {
+      logger.error('Erreur suppression avatar:', error);
+      res.status(500).json({ error: 'Erreur serveur' });
+    }
+  }
+
+  /**
    * Upload d'une vidéo pour un post
    */
   static async uploadPostVideo(req, res) {

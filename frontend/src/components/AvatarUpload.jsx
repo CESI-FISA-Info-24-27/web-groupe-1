@@ -68,9 +68,8 @@ const AvatarUpload = ({ currentAvatar, onAvatarChange, className = '' }) => {
     try {
       setIsUploading(true);
       
-      // Extraire le nom de fichier de l'URL
-      const fileName = currentAvatar.split('/').pop();
-      await mediaService.deleteMedia('avatars', fileName);
+      // Appeler l'API pour supprimer l'avatar
+      await mediaService.deleteAvatar();
       
       setPreview(null);
       

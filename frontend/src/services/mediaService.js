@@ -61,6 +61,18 @@ export const mediaService = {
   },
 
   /**
+   * Supprimer l'avatar
+   */
+  async deleteAvatar() {
+    try {
+      const response = await mediaApi.delete('/avatar');
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.error || 'Erreur lors de la suppression');
+    }
+  },
+
+  /**
    * Upload d'une image pour un post
    */
   async uploadPostImage(file, onProgress) {

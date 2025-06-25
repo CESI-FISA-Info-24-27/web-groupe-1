@@ -3,7 +3,7 @@ const express = require('express');
 const multer = require('multer');
 const MediaController = require('../controllers/mediaController');
 const logger = require('../utils/logger');
-
+const { authenticateToken } = require('../middleware/auth');
 const router = express.Router();
 
 // Configuration Multer pour l'upload en mémoire
@@ -87,5 +87,7 @@ router.get('/stats',
 
 // Route de test pour vérifier la connexion MinIO
 router.get('/test', MediaController.testConnection);
+
+router.delete('/avatar', authenticateToken, MediaController.deleteAvatar);
 
 module.exports = router;
