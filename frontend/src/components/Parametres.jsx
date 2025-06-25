@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useNavigate } from 'react-router-dom'
-import { useTheme } from '../context/ThemeContext' // ✅ Ajout du hook theme
+import { useTheme } from '../context/ThemeContext'
 import LeftSidebar from './LeftSidebar'
+import AvatarUpload from './AvatarUpload' // ✅ Nouveau composant MinIO
+import { mediaService } from '../services/mediaService' // ✅ Service MinIO
 
 const Parametres = () => {
   const { user, logout, updateUser } = useAuth()
   const navigate = useNavigate()
-  const { isDarkMode, toggleTheme, isInitialized } = useTheme() // ✅ Ajout isInitialized
+  const { isDarkMode, toggleTheme, isInitialized } = useTheme()
   const [isEditing, setIsEditing] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -29,7 +31,7 @@ const Parametres = () => {
   // Initialize form data from user
   useEffect(() => {
     if (user) {
-      console.log('Current user data:', user) // Debug pour voir les données
+      console.log('Current user data:', user)
       setFormData({
         prenom: user.prenom || '',
         nom: user.nom || '',
@@ -37,7 +39,7 @@ const Parametres = () => {
         mail: user.mail || '',
         bio: user.bio || '',
         date_naissance: user.date_naissance ? user.date_naissance.split('T')[0] : '',
-        telephone: user.telephone || '', // S'assurer que le téléphone est bien récupéré
+        telephone: user.telephone || '',
         private: user.private || false
       })
     }
@@ -58,18 +60,13 @@ const Parametres = () => {
 
       if (response.ok) {
         const userData = await response.json()
-        console.log('Refreshed user data:', userData) // Debug
+        console.log('Refreshed user data:', userData)
         updateUser(userData)
       }
     } catch (error) {
       console.error('Error refreshing user data:', error)
     }
   }
-
-  // Rafraîchir les données au chargement du composant
-  useEffect(() => {
-    // refreshUserData()
-  }, [])
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target
@@ -107,9 +104,6 @@ const Parametres = () => {
         updateUser(updatedUser)
         setSuccess('Profil mis à jour avec succès !')
         setIsEditing(false)
-        
-        // Rafraîchir les données pour être sûr
-        // await refreshUserData()
       } else {
         const errorData = await response.json()
         setError(errorData.message || 'Erreur lors de la mise à jour')
@@ -141,19 +135,25 @@ const Parametres = () => {
     setSuccess('')
   }
 
+  // ✅ NOUVEAU : Gestionnaire de changement d'avatar
+  const handleAvatarChange = (newAvatarUrl) => {
+    updateUser({
+      ...user,
+      photo_profil: newAvatarUrl
+    })
+    setSuccess('Photo de profil mise à jour !')
+  }
+
   const handleChangePassword = () => {
-    // TODO: Implement password change
     alert('Changement de mot de passe à implémenter')
   }
 
   const handleDelete2FA = () => {
-    // TODO: Implement 2FA management
     alert('Gestion 2FA à implémenter')
   }
 
   const handleDeleteAccount = () => {
     if (window.confirm('Êtes-vous sûr de vouloir supprimer votre compte ? Cette action est irréversible.')) {
-      // TODO: Implement account deletion
       alert('Suppression de compte à implémenter')
     }
   }
@@ -290,31 +290,26 @@ const Parametres = () => {
                   <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Photo de profil</h2>
                   
                   <div className="text-center space-y-4">
-                    <div className="w-24 h-24 mx-auto rounded-full overflow-hidden border-4 border-gray-100 dark:border-gray-700">
-                      {user?.photo_profil ? (
-                        <img src={user.photo_profil} alt="Profile" className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-                          <span className="text-white text-xl font-bold">{getInitials(user)}</span>
-                        </div>
-                      )}
-                    </div>
+                    {/* ✅ REMPLACÉ : Utiliser le nouveau composant AvatarUpload */}
+                    <AvatarUpload
+                      currentAvatar={user?.photo_profil}
+                      onAvatarChange={handleAvatarChange}
+                      className="mx-auto"
+                    />
                     
-                    <div>
-                      <button className="bg-black dark:bg-white text-white dark:text-black px-4 py-2 rounded-lg hover:bg-gray-800 dark:hover:bg-gray-200 transition-colors text-sm font-medium">
-                        Changer la photo
-                      </button>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">JPG, PNG ou GIF. Max 5MB.</p>
-                    </div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-4">
+                      JPG, PNG ou WebP. Maximum 5MB.<br/>
+                      L'image sera automatiquement redimensionnée.
+                    </p>
                   </div>
                 </div>
                 
-                {/* Section Préférences - ✅ BOUTON MODE DARK FONCTIONNEL */}
+                {/* Section Préférences */}
                 <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 mt-6 transition-colors duration-200">
                   <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Préférences</h2>
                   
                   <div className="space-y-3">
-                    {/* Mode sombre - ✅ BOUTON FONCTIONNEL AVEC DEBUG */}
+                    {/* Mode sombre */}
                     <div className="flex items-center justify-between py-2">
                       <div>
                         <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Mode sombre</p>
