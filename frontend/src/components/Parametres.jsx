@@ -16,10 +16,6 @@ const Parametres = () => {
   const [success, setSuccess] = useState('')
   const [showMobileMenu, setShowMobileMenu] = useState(false)
   
-  // ✅ NOUVEAU : États pour les statistiques MinIO
-  const [storageStats, setStorageStats] = useState(null)
-  const [loadingStats, setLoadingStats] = useState(false)
-  
   // Form data
   const [formData, setFormData] = useState({
     prenom: '',
@@ -48,23 +44,6 @@ const Parametres = () => {
       })
     }
   }, [user])
-
-  // ✅ NOUVEAU : Charger les statistiques de stockage
-  useEffect(() => {
-    loadStorageStats()
-  }, [])
-
-  const loadStorageStats = async () => {
-    try {
-      setLoadingStats(true)
-      const stats = await mediaService.getStorageStats()
-      setStorageStats(stats)
-    } catch (error) {
-      console.warn('Impossible de charger les statistiques de stockage:', error)
-    } finally {
-      setLoadingStats(false)
-    }
-  }
 
   // Fonction pour rafraîchir les données utilisateur depuis l'API
   const refreshUserData = async () => {
@@ -163,7 +142,6 @@ const Parametres = () => {
       photo_profil: newAvatarUrl
     })
     setSuccess('Photo de profil mise à jour !')
-    loadStorageStats() // Recharger les stats
   }
 
   const handleChangePassword = () => {
@@ -186,15 +164,6 @@ const Parametres = () => {
       return `${user.prenom[0]}${user.nom[0]}`.toUpperCase()
     }
     return user.username?.[0]?.toUpperCase() || 'U'
-  }
-
-  // ✅ NOUVEAU : Fonction pour formater la taille des fichiers
-  const formatFileSize = (bytes) => {
-    if (!bytes) return '0 B'
-    const k = 1024
-    const sizes = ['B', 'KB', 'MB', 'GB']
-    const i = Math.floor(Math.log(bytes) / Math.log(k))
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
   }
 
   return (
@@ -334,53 +303,6 @@ const Parametres = () => {
                     </p>
                   </div>
                 </div>
-
-                {/* ✅ NOUVEAU : Section Statistiques de stockage */}
-                {storageStats && (
-                  <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 mt-6 transition-colors duration-200">
-                    <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Stockage utilisé</h2>
-                    
-                    <div className="space-y-3">
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-gray-600 dark:text-gray-400">Avatars</span>
-                        <span className="text-sm font-medium">
-                          {storageStats.storage.avatars.count} - {formatFileSize(storageStats.storage.avatars.size)}
-                        </span>
-                      </div>
-                      
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-gray-600 dark:text-gray-400">Images</span>
-                        <span className="text-sm font-medium">
-                          {storageStats.storage.images.count} - {formatFileSize(storageStats.storage.images.size)}
-                        </span>
-                      </div>
-                      
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-gray-600 dark:text-gray-400">Vidéos</span>
-                        <span className="text-sm font-medium">
-                          {storageStats.storage.videos.count} - {formatFileSize(storageStats.storage.videos.size)}
-                        </span>
-                      </div>
-                      
-                      <hr className="border-gray-200 dark:border-gray-700" />
-                      
-                      <div className="flex justify-between items-center font-semibold">
-                        <span className="text-sm">Total</span>
-                        <span className="text-sm">
-                          {storageStats.storage.total.count} - {formatFileSize(storageStats.storage.total.size)}
-                        </span>
-                      </div>
-                    </div>
-                    
-                    <button
-                      onClick={loadStorageStats}
-                      disabled={loadingStats}
-                      className="w-full mt-4 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 px-3 py-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-sm"
-                    >
-                      {loadingStats ? 'Actualisation...' : 'Actualiser'}
-                    </button>
-                  </div>
-                )}
                 
                 {/* Section Préférences */}
                 <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 mt-6 transition-colors duration-200">
