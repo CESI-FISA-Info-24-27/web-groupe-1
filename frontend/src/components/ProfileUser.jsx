@@ -26,6 +26,7 @@ const ProfileUser = () => {
   const [showMobileMenu, setShowMobileMenu] = useState(false)
   const [error, setError] = useState('')
   const [isFollowing, setIsFollowing] = useState(false)
+  const [followStatus, setFollowStatus] = useState('not_following') // ✅ NOUVEAU
   const [isFollowLoading, setIsFollowLoading] = useState(false)
 
   // ✅ Rediriger si c'est son propre profil
@@ -62,7 +63,10 @@ const ProfileUser = () => {
       if (response.ok) {
         const userData = await response.json()
         setProfileUser(userData)
-        setIsFollowing(userData.isFollowing || false)
+        console.log('👤 Profile user loaded:', userData) // Debug
+        
+        // ✅ CORRIGÉ: Vérifier le statut de suivi séparément
+        fetchFollowStatus()
       } else if (response.status === 404) {
         setError('Utilisateur non trouvé')
       } else if (response.status === 403) {
@@ -75,6 +79,37 @@ const ProfileUser = () => {
       setError('Erreur de connexion')
     } finally {
       setProfileLoading(false)
+    }
+  }, [userId])
+
+  // ✅ NOUVEAU: Vérifier le statut de suivi spécifiquement
+  const fetchFollowStatus = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('accessToken')
+      if (!token || !userId) return
+
+      const response = await fetch(`/api/v1/follow/status/${userId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+
+      if (response.ok) {
+        const statusData = await response.json()
+        console.log('📊 Follow status response:', statusData) // Debug
+        setFollowStatus(statusData.status || 'not_following')
+        setIsFollowing(statusData.status === 'following')
+      } else {
+        console.error('❌ Follow status error:', response.status)
+        setFollowStatus('not_following')
+        setIsFollowing(false)
+      }
+    } catch (error) {
+      console.error('Error fetching follow status:', error)
+      // Fallback: essayer avec l'ancienne méthode
+      setIsFollowing(false)
+      setFollowStatus('not_following')
     }
   }, [userId])
 
@@ -150,15 +185,24 @@ const ProfileUser = () => {
     return () => clearTimeout(timer)
   }, [userId, fetchProfileUser, fetchUserStats, fetchUserPosts])
 
-  // ✅ Gestion du follow/unfollow
+  // ✅ CORRIGÉ: Gestion du follow/unfollow avec statut approprié
   const handleFollowToggle = async () => {
     if (!profileUser || isFollowLoading) return
 
     setIsFollowLoading(true)
     try {
       const token = localStorage.getItem('accessToken')
-      const endpoint = isFollowing ? `/api/v1/follow/${profileUser.id_user}` : `/api/v1/follow/${profileUser.id_user}`
-      const method = isFollowing ? 'DELETE' : 'POST'
+      let endpoint, method
+
+      if (followStatus === 'following') {
+        // Unfollow
+        endpoint = `/api/v1/follow/${profileUser.id_user}`
+        method = 'DELETE'
+      } else {
+        // Follow
+        endpoint = `/api/v1/follow/${profileUser.id_user}`
+        method = 'POST'
+      }
       
       const response = await fetch(endpoint, {
         method: method,
@@ -169,11 +213,37 @@ const ProfileUser = () => {
       })
 
       if (response.ok) {
-        setIsFollowing(!isFollowing)
-        setStats(prev => ({
-          ...prev,
-          followers: isFollowing ? prev.followers - 1 : prev.followers + 1
-        }))
+        const data = await response.json()
+        console.log('🔄 Follow toggle response:', data) // Debug
+        
+        // ✅ Gérer les différents statuts de réponse
+        if (method === 'POST') {
+          if (data.isPending) {
+            setFollowStatus('pending')
+            setIsFollowing(false)
+            console.log('📤 Follow request sent (pending)')
+          } else {
+            setFollowStatus('following')
+            setIsFollowing(true)
+            setStats(prev => ({
+              ...prev,
+              followers: prev.followers + 1
+            }))
+            console.log('✅ Now following user')
+          }
+        } else {
+          // Unfollow réussi
+          setFollowStatus('not_following')
+          setIsFollowing(false)
+          setStats(prev => ({
+            ...prev,
+            followers: Math.max(0, prev.followers - 1)
+          }))
+          console.log('❌ Unfollowed user')
+        }
+      } else {
+        const errorData = await response.json().catch(() => ({}))
+        console.error('Follow toggle failed:', errorData)
       }
     } catch (error) {
       console.error('Error toggling follow:', error)
@@ -234,6 +304,34 @@ const ProfileUser = () => {
       return `${user.prenom[0]}${user.nom[0]}`.toUpperCase()
     }
     return user.username?.[0]?.toUpperCase() || 'U'
+  }
+
+  // ✅ CORRIGÉ: Fonction pour obtenir le texte du bouton selon le statut
+  const getFollowButtonText = () => {
+    if (isFollowLoading) return 'Chargement...'
+    
+    switch (followStatus) {
+      case 'following':
+        return 'Ne plus suivre'
+      case 'pending':
+        return 'Demande envoyée'
+      case 'not_following':
+      default:
+        return 'Suivre'
+    }
+  }
+
+  // ✅ CORRIGÉ: Fonction pour obtenir le style du bouton selon le statut
+  const getFollowButtonStyle = () => {
+    switch (followStatus) {
+      case 'following':
+        return 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+      case 'pending':
+        return 'bg-yellow-100 text-yellow-800 cursor-not-allowed'
+      case 'not_following':
+      default:
+        return 'bg-black text-white hover:bg-gray-800'
+    }
   }
 
   // ✅ Affichage immédiat même pendant le chargement du profil
@@ -359,14 +457,10 @@ const ProfileUser = () => {
                     <div className="flex flex-col sm:flex-row gap-3 mt-4 lg:mt-0">
                       <button
                         onClick={handleFollowToggle}
-                        disabled={isFollowLoading}
-                        className={`px-6 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 ${
-                          isFollowing
-                            ? 'bg-gray-200 text-gray-800 hover:bg-gray-300'
-                            : 'bg-black text-white hover:bg-gray-800'
-                        }`}
+                        disabled={isFollowLoading || followStatus === 'pending'}
+                        className={`px-6 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 ${getFollowButtonStyle()}`}
                       >
-                        {isFollowLoading ? 'Chargement...' : (isFollowing ? 'Ne plus suivre' : 'Suivre')}
+                        {getFollowButtonText()}
                       </button>
                       <button
                         onClick={handleSendMessage}

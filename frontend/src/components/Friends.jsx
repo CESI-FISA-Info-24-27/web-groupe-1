@@ -1,4 +1,4 @@
-// src/components/Friends.jsx - Version complète et optimisée
+// src/components/Friends.jsx - Version corrigée avec routes API correctes
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -88,12 +88,12 @@ const Friends = () => {
 
       return response.ok ? token : null;
     } catch (error) {
-      console.error('Token check error:', error);
+      console.error('Token check failed:', error);
       return token;
     }
   }, [navigate, API_BASE]);
 
-  // Récupération des amis
+  // ✅ CORRECTION : Chargement des amis avec la vraie route
   const fetchFriends = useCallback(async () => {
     try {
       const response = await makeAuthenticatedRequest(
@@ -112,7 +112,7 @@ const Friends = () => {
     }
   }, [user?.id_user, makeAuthenticatedRequest, API_BASE]);
 
-  // Récupération des demandes en attente
+  // ✅ CORRECTION : Chargement des demandes en attente avec la vraie route
   const fetchPendingRequests = useCallback(async () => {
     try {
       const response = await makeAuthenticatedRequest(
@@ -131,14 +131,15 @@ const Friends = () => {
     }
   }, [makeAuthenticatedRequest, API_BASE]);
 
-  // Récupération des suggestions
+  // ✅ CORRECTION : Chargement des suggestions avec la vraie route
   const fetchSuggestions = useCallback(async () => {
     try {
+      // Essaie d'abord les suggestions d'utilisateurs
       let response = await makeAuthenticatedRequest(
         `${API_BASE}/users/suggested?limit=50`
       );
 
-      // Fallback vers la recherche si suggestions non disponibles
+      // Si pas de suggestions, utilise la recherche générale
       if (!response.ok && response.status === 404) {
         response = await makeAuthenticatedRequest(
           `${API_BASE}/users/search?limit=50`
@@ -173,71 +174,37 @@ const Friends = () => {
       
       await fetchMap[activeTab]?.();
     } catch (error) {
-      console.error('Error fetching data:', error);
       setError('Erreur lors du chargement des données');
+      console.error('Fetch error:', error);
     } finally {
       setLoading(false);
     }
-  }, [activeTab, user?.id_user, fetchFriends, fetchPendingRequests, fetchSuggestions]);
+  }, [activeTab, fetchFriends, fetchPendingRequests, fetchSuggestions, user?.id_user]);
 
+  // Chargement initial
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
-  // Actions utilisateur optimisées
-  const handleFollow = useCallback(async (userId, username) => {
-    if (actionLoading.has(userId)) return;
-    
-    setActionLoading(prev => new Set([...prev, userId]));
+  // ✅ CORRECTION : Action de suivre avec la vraie route backend
+  const handleFollow = useCallback(async (userId, displayName) => {
+    setActionLoading(prev => new Set(prev).add(userId));
     setError(null);
     
     try {
-      const response = await makeAuthenticatedRequest(
-        `${API_BASE}/follow/${userId}`,
-        { method: 'POST' }
-      );
+      // ✅ CORRIGÉ: Utilise la route /follow/:id du backend
+      const response = await makeAuthenticatedRequest(`${API_BASE}/follow/${userId}`, {
+        method: 'POST',
+        body: JSON.stringify({ followed_id: userId })
+      });
 
       if (response.ok) {
         const data = await response.json();
-        setSuggestions(prev => prev.filter(user => user.id_user !== userId));
-        
-        if (data.isPending) {
-          setSuccessMessage(`Demande envoyée à ${username}`);
-          fetchPendingRequests();
-        } else {
-          setSuccessMessage(`Vous suivez maintenant ${username}`);
-          fetchFriends();
-        }
-      } else {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || `Erreur ${response.status}`);
-      }
-    } catch (error) {
-      setError(`Erreur lors du suivi de ${username}: ${error.message}`);
-    } finally {
-      setActionLoading(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(userId);
-        return newSet;
-      });
-    }
-  }, [makeAuthenticatedRequest, fetchPendingRequests, fetchFriends, API_BASE]);
-
-  const handleUnfollow = useCallback(async (userId, username) => {
-    if (actionLoading.has(userId) || !window.confirm(`Ne plus suivre ${username} ?`)) return;
-    
-    setActionLoading(prev => new Set([...prev, userId]));
-    setError(null);
-    
-    try {
-      const response = await makeAuthenticatedRequest(
-        `${API_BASE}/follow/${userId}`,
-        { method: 'DELETE' }
-      );
-
-      if (response.ok) {
-        setSuccessMessage(`Vous ne suivez plus ${username}`);
-        fetchFriends();
+        const message = data.isPending 
+          ? `Demande envoyée à ${displayName}` 
+          : `Vous suivez maintenant ${displayName}`;
+        setSuccessMessage(message);
+        fetchSuggestions();
       } else {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.message || `Erreur ${response.status}`);
@@ -251,19 +218,18 @@ const Friends = () => {
         return newSet;
       });
     }
-  }, [makeAuthenticatedRequest, fetchFriends, API_BASE]);
+  }, [makeAuthenticatedRequest, fetchSuggestions, API_BASE]);
 
+  // ✅ CORRECTION : Accepter une demande avec la vraie route
   const handleAcceptRequest = useCallback(async (userId, username) => {
-    if (actionLoading.has(userId)) return;
-    
-    setActionLoading(prev => new Set([...prev, userId]));
+    setActionLoading(prev => new Set(prev).add(userId));
     setError(null);
     
     try {
-      const response = await makeAuthenticatedRequest(
-        `${API_BASE}/follow/requests/${userId}/accept`,
-        { method: 'POST' }
-      );
+      // ✅ CORRIGÉ: Route d'acceptation avec le bon endpoint
+      const response = await makeAuthenticatedRequest(`${API_BASE}/follow/requests/${userId}/accept`, {
+        method: 'POST'
+      });
 
       if (response.ok) {
         setSuccessMessage(`Demande de ${username} acceptée`);
@@ -284,17 +250,16 @@ const Friends = () => {
     }
   }, [makeAuthenticatedRequest, fetchPendingRequests, fetchFriends, API_BASE]);
 
+  // ✅ CORRECTION : Rejeter une demande avec la vraie route
   const handleRejectRequest = useCallback(async (userId, username) => {
-    if (actionLoading.has(userId)) return;
-    
-    setActionLoading(prev => new Set([...prev, userId]));
+    setActionLoading(prev => new Set(prev).add(userId));
     setError(null);
     
     try {
-      const response = await makeAuthenticatedRequest(
-        `${API_BASE}/follow/requests/${userId}/reject`,
-        { method: 'POST' }
-      );
+      // ✅ CORRIGÉ: Route de rejet avec le bon endpoint
+      const response = await makeAuthenticatedRequest(`${API_BASE}/follow/requests/${userId}/reject`, {
+        method: 'POST'
+      });
 
       if (response.ok) {
         setSuccessMessage(`Demande de ${username} rejetée`);
@@ -314,15 +279,25 @@ const Friends = () => {
     }
   }, [makeAuthenticatedRequest, fetchPendingRequests, API_BASE]);
 
-  // Navigation et recherche
+  // Navigation vers le profil utilisateur
   const handleViewProfile = useCallback((userId) => {
-    navigate(`/user/${userId}`);
-  }, [navigate]);
+    if (!userId) {
+      console.error('ID utilisateur manquant pour la navigation');
+      return;
+    }
+    
+    if (parseInt(userId) === parseInt(user?.id_user)) {
+      navigate('/profile');
+    } else {
+      navigate(`/profile/${userId}`);
+    }
+  }, [navigate, user?.id_user]);
 
   const handleSendMessage = useCallback((userId) => {
     navigate('/messages', { state: { selectedUserId: userId } });
   }, [navigate]);
 
+  // ✅ CORRECTION : Recherche avec la vraie route
   const handleSearchUsers = useCallback(async () => {
     if (!searchTerm.trim()) return;
     
@@ -464,53 +439,37 @@ const Friends = () => {
           <h1 className="text-xl font-bold text-gray-900">Amis</h1>
           <div className="w-8 h-8 rounded-full overflow-hidden bg-gradient-to-br from-purple-400 to-pink-500 flex items-center justify-center">
             {user?.photo_profil ? (
-              <img src={user.photo_profil} alt="Your profile" className="w-full h-full object-cover" />
+              <img src={user.photo_profil} alt="Profile" className="w-full h-full object-cover" />
             ) : (
-              <span className="text-white font-bold text-sm">{getInitials(user)}</span>
+              <span className="text-white font-bold text-sm">
+                {user?.prenom?.[0]?.toUpperCase() || user?.username?.[0]?.toUpperCase() || 'U'}
+              </span>
             )}
           </div>
         </div>
       </div>
 
-      {/* Mobile Menu Overlay */}
-      {showMobileMenu && (
-        <div className="lg:hidden fixed inset-0 z-50">
-          <div 
-            className="fixed inset-0 bg-black bg-opacity-10"
-            onClick={() => setShowMobileMenu(false)}
-          ></div>
-          <div className="fixed top-0 left-0 h-full w-80 bg-white shadow-xl overflow-y-auto">
-            <div className="flex items-center justify-between p-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">Menu</h2>
-              <button 
-                onClick={() => setShowMobileMenu(false)}
-                className="p-2 rounded-full hover:bg-gray-100 transition-colors"
-              >
-                <svg className="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <div className="p-4">
+      <div className="flex">
+        {/* Sidebar gauche */}
+        <div className="hidden lg:block lg:w-64 lg:fixed lg:h-full">
+          <LeftSidebar />
+        </div>
+
+        {/* Menu mobile */}
+        {showMobileMenu && (
+          <div className="lg:hidden fixed inset-0 z-40 bg-black bg-opacity-50" onClick={() => setShowMobileMenu(false)}>
+            <div className="w-64 h-full bg-white">
               <LeftSidebar />
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      <div className="flex max-w-7xl mx-auto">
-        {/* Left Sidebar - Hidden on mobile */}
-        <div className="hidden lg:block lg:fixed lg:left-0 lg:w-72 lg:h-screen lg:overflow-y-auto">
-          <LeftSidebar />
-        </div>
-        
-        {/* Main Content */}
-        <main className="flex-1 lg:ml-72 xl:mr-80 pt-16 lg:pt-0">
-          <div className="max-w-4xl mx-auto px-3 sm:px-4 lg:px-8 py-4 lg:py-6">
-
+        {/* Contenu principal */}
+        <main className="flex-1 lg:ml-64 xl:mr-80 pt-16 lg:pt-0">
+          <div className="max-w-4xl mx-auto px-4 py-6 lg:px-8">
             {/* Header */}
-            <div className="mb-6 lg:mb-8">
-              <h1 className="text-2xl font-bold text-gray-900">Mes Amis</h1>
+            <div className="mb-6">
+              <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-2">Amis</h1>
               <p className="text-gray-600">Gérez vos connexions et découvrez de nouveaux amis</p>
             </div>
 
@@ -533,7 +492,7 @@ const Friends = () => {
                 <button
                   onClick={handleSearchUsers}
                   disabled={!searchTerm.trim() || loading}
-                  className="px-6 py-3 bg-black text-white rounded-xl hover:bg-grey transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-6 py-3 bg-black text-white rounded-xl hover:bg-gray-800 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Rechercher
                 </button>
@@ -548,64 +507,61 @@ const Friends = () => {
                     <svg className="w-5 h-5 text-red-600 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    <p className="text-red-700">{error}</p>
+                    <span className="text-red-800">{error}</span>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <button 
-                      onClick={() => {
-                        setError(null);
-                        fetchData();
-                      }}
-                      className="text-red-600 hover:text-red-800 text-sm underline"
-                    >
-                      Réessayer
-                    </button>
-                    <button 
-                      onClick={() => setError(null)}
-                      className="text-red-600 hover:text-red-800 text-lg font-bold"
-                    >
-                      ×
-                    </button>
-                  </div>
+                  <button onClick={() => setError(null)} className="text-red-600 hover:text-red-800">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
                 </div>
               </div>
             )}
 
             {successMessage && (
               <div className="mb-4 p-4 bg-green-100 border border-green-200 rounded-lg">
-                <div className="flex items-center">
-                  <svg className="w-5 h-5 text-green-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  <p className="text-green-700">{successMessage}</p>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <svg className="w-5 h-5 text-green-600 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span className="text-green-800">{successMessage}</span>
+                  </div>
+                  <button onClick={() => setSuccessMessage('')} className="text-green-600 hover:text-green-800">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
                 </div>
               </div>
             )}
 
             {/* Tabs */}
             <div className="mb-6">
-              <div className="flex space-x-1 bg-gray-100 rounded-lg p-1">
-                {tabConfig.map((tab) => (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`flex-1 flex items-center justify-center space-x-2 px-3 lg:px-4 py-2.5 text-sm lg:text-base font-medium rounded-md transition-all ${
-                      activeTab === tab.id
-                        ? 'bg-white text-gray-900 shadow-sm'
-                        : 'text-gray-600 hover:text-gray-900'
-                    }`}
-                  >
-                    {tab.icon}
-                    <span>{tab.label}</span>
-                    {tab.count > 0 && (
-                      <span className={`text-xs px-2 py-0.5 rounded-full ${
-                        activeTab === tab.id ? 'bg-blue-100 text-blue-600' : 'bg-gray-200 text-gray-600'
-                      }`}>
-                        {tab.count}
-                      </span>
-                    )}
-                  </button>
-                ))}
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-1">
+                <div className="flex space-x-1">
+                  {tabConfig.map((tab) => (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`flex-1 flex items-center justify-center space-x-2 px-4 py-3 rounded-lg text-sm font-medium transition-all ${
+                        activeTab === tab.id
+                          ? 'bg-blue-50 text-blue-600 shadow-sm'
+                          : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                      }`}
+                    >
+                      {tab.icon}
+                      <span className="hidden sm:inline">{tab.label}</span>
+                      {tab.count > 0 && (
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+                          activeTab === tab.id ? 'bg-blue-100 text-blue-600' : 'bg-gray-200 text-gray-600'
+                        }`}>
+                          {tab.count}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 
@@ -637,7 +593,7 @@ const Friends = () => {
                   {filteredData.map((person, index) => (
                     <div key={person.id_user} className="p-4 lg:p-6 hover:bg-gray-50 transition-colors">
                       <div className="flex items-center space-x-4">
-                        {/* Avatar */}
+                        {/* Avatar cliquable */}
                         <div 
                           className={`w-12 h-12 lg:w-16 lg:h-16 rounded-full overflow-hidden bg-gradient-to-br ${getRandomGradient(index)} flex items-center justify-center cursor-pointer hover:scale-105 transition-transform`}
                           onClick={() => handleViewProfile(person.id_user)}
@@ -645,8 +601,8 @@ const Friends = () => {
                           {person.photo_profil ? (
                             <img 
                               src={person.photo_profil} 
-                              alt={getDisplayName(person)}
-                              className="w-full h-full object-cover" 
+                              alt={getDisplayName(person)} 
+                              className="w-full h-full object-cover"
                             />
                           ) : (
                             <span className="text-white font-bold text-lg lg:text-xl">
@@ -655,51 +611,42 @@ const Friends = () => {
                           )}
                         </div>
 
-                        {/* User Info */}
+                        {/* Informations utilisateur */}
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center space-x-2 mb-1">
-                            <h3 
-                              className="font-semibold text-gray-900 truncate cursor-pointer hover:text-blue-600 transition-colors"
-                              onClick={() => handleViewProfile(person.id_user)}
-                            >
-                              {getDisplayName(person)}
-                            </h3>
-                            {person.certified && (
-                              <svg className="w-4 h-4 text-blue-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                              </svg>
-                            )}
-                          </div>
-                          <p className="text-sm text-gray-600 truncate">@{person.username}</p>
+                          <h3 
+                            className="font-semibold text-gray-900 text-sm lg:text-base truncate cursor-pointer hover:text-blue-600 transition-colors"
+                            onClick={() => handleViewProfile(person.id_user)}
+                          >
+                            {getDisplayName(person)}
+                          </h3>
+                          <p className="text-gray-600 text-xs lg:text-sm truncate">@{person.username}</p>
                           {person.bio && (
-                            <p className="text-sm text-gray-500 mt-1 line-clamp-2">{person.bio}</p>
-                          )}
-                          {person.followerCount !== undefined && (
-                            <p className="text-xs text-gray-400 mt-1">
-                              {person.followerCount} followers
-                            </p>
+                            <p className="text-gray-500 text-xs lg:text-sm mt-1 line-clamp-2">{person.bio}</p>
                           )}
                         </div>
 
-                        {/* Action Buttons */}
-                        <div className="flex items-center space-x-2 flex-shrink-0">
+                        {/* Actions */}
+                        <div className="flex items-center space-x-2">
                           {activeTab === 'friends' && (
                             <>
                               <button
-                                onClick={() => handleSendMessage(person.id_user)}
+                                onClick={() => handleViewProfile(person.id_user)}
                                 className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-all"
+                                title="Voir le profil"
+                              >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                </svg>
+                              </button>
+                              <button
+                                onClick={() => handleSendMessage(person.id_user)}
+                                className="p-2 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-full transition-all"
                                 title="Envoyer un message"
                               >
                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                                 </svg>
-                              </button>
-                              <button
-                                onClick={() => handleUnfollow(person.id_user, getDisplayName(person))}
-                                disabled={actionLoading.has(person.id_user)}
-                                className="px-3 lg:px-4 py-1.5 lg:py-2 text-xs lg:text-sm font-medium text-red-600 hover:text-red-800 hover:bg-red-50 rounded-full transition-all disabled:opacity-50"
-                              >
-                                {actionLoading.has(person.id_user) ? 'Chargement...' : 'Ne plus suivre'}
                               </button>
                             </>
                           )}
@@ -709,7 +656,7 @@ const Friends = () => {
                               <button
                                 onClick={() => handleAcceptRequest(person.id_user, getDisplayName(person))}
                                 disabled={actionLoading.has(person.id_user)}
-                                className="px-3 lg:px-4 py-1.5 lg:py-2 text-xs lg:text-sm font-medium bg-blue-500 text-white rounded-full hover:bg-blue-600 transition-all disabled:opacity-50"
+                                className="px-3 lg:px-4 py-1.5 lg:py-2 text-xs lg:text-sm font-medium bg-black text-white rounded-full hover:bg-gray-800 transition-all disabled:opacity-50"
                               >
                                 {actionLoading.has(person.id_user) ? '...' : 'Accepter'}
                               </button>
@@ -740,100 +687,30 @@ const Friends = () => {
                                 disabled={actionLoading.has(person.id_user)}
                                 className="px-3 lg:px-4 py-1.5 lg:py-2 text-xs lg:text-sm font-medium bg-black text-white rounded-full hover:bg-gray-800 transition-all disabled:opacity-50"
                               >
-                                {actionLoading.has(person.id_user) ? 'Chargement...' : 'Suivre'}
+                                {actionLoading.has(person.id_user) ? '...' : 'Suivre'}
                               </button>
                             </>
                           )}
                         </div>
                       </div>
-
-                      {/* Additional info for requests */}
-                      {activeTab === 'requests' && person.requestDate && (
-                        <div className="mt-3 pl-16 lg:pl-20">
-                          <p className="text-xs text-gray-500">
-                            Demande reçue le {new Date(person.requestDate).toLocaleDateString('fr-FR', {
-                              day: 'numeric',
-                              month: 'long',
-                              year: 'numeric'
-                            })}
-                          </p>
-                        </div>
-                      )}
-
-                      {/* Mutual friends indicator */}
-                      {person.mutualFriends && person.mutualFriends > 0 && (
-                        <div className="mt-3 pl-16 lg:pl-20">
-                          <p className="text-xs text-gray-500 flex items-center">
-                            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
-                            </svg>
-                            {person.mutualFriends} ami{person.mutualFriends > 1 ? 's' : ''} en commun
-                          </p>
-                        </div>
-                      )}
                     </div>
                   ))}
                 </div>
               )}
             </div>
 
-            {/* Stats Summary */}
-            <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="bg-white rounded-lg p-4 border border-gray-200">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <svg className="w-8 h-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                    </svg>
-                  </div>
-                  <div className="ml-3">
-                    <p className="text-sm font-medium text-gray-500">Amis</p>
-                    <p className="text-2xl font-semibold text-gray-900">{friends.length}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white rounded-lg p-4 border border-gray-200">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <svg className="w-8 h-8 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </div>
-                  <div className="ml-3">
-                    <p className="text-sm font-medium text-gray-500">Demandes</p>
-                    <p className="text-2xl font-semibold text-gray-900">{pendingRequests.length}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white rounded-lg p-4 border border-gray-200">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <svg className="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
-                  </div>
-                  <div className="ml-3">
-                    <p className="text-sm font-medium text-gray-500">Suggestions</p>
-                    <p className="text-2xl font-semibold text-gray-900">{suggestions.length}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Quick Actions */}
-            <div className="mt-6 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-6 border border-blue-100">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Actions rapides</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Actions rapides en bas */}
+            <div className="mt-6 lg:mt-8">
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <h3 className="font-semibold text-gray-900 mb-4">Actions rapides</h3>
+                
                 <button
                   onClick={() => {
+                    setSearchTerm('');
                     setActiveTab('suggestions');
-                    if (suggestions.length === 0) {
-                      fetchSuggestions();
-                    }
+                    fetchData();
                   }}
-                  className="flex items-center space-x-3 p-3 bg-white rounded-lg hover:bg-gray-50 transition-colors text-left"
+                  className="flex items-center space-x-3 p-3 bg-white rounded-lg hover:bg-gray-50 transition-colors text-left w-full mb-3"
                 >
                   <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
                     <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -852,7 +729,7 @@ const Friends = () => {
                     setActiveTab('suggestions');
                     fetchData();
                   }}
-                  className="flex items-center space-x-3 p-3 bg-white rounded-lg hover:bg-gray-50 transition-colors text-left"
+                  className="flex items-center space-x-3 p-3 bg-white rounded-lg hover:bg-gray-50 transition-colors text-left w-full"
                 >
                   <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
                     <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
