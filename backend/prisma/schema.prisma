@@ -93,7 +93,7 @@ model User {
   password_hash String    @db.VarChar(255)
   telephone     String?   @db.VarChar(20)
   bio           String?   @db.VarChar(255)
-  photo_profil  String?   @db.VarChar(255)
+  photo_profil  String    @db.VarChar(255) @default("http://localhost:9000/avatars/default/default_avatar.jpg")
   id_role       Int
   private       Boolean
   certified     Boolean

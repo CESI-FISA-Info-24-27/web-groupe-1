@@ -187,7 +187,7 @@ class MediaController {
       await prisma.user.update({
         where: { id_user: userId },
         data: { 
-          photo_profil: null,
+          photo_profil: 'http://localhost:9000/avatars/default/default_avatar.jpg',
           updated_at: new Date()
         }
       });

@@ -8,6 +8,17 @@ const AvatarUpload = ({ currentAvatar, onAvatarChange, className = '' }) => {
   const [preview, setPreview] = useState(currentAvatar);
   const [error, setError] = useState('');
   const fileInputRef = useRef(null);
+  
+  const isDefaultAvatar = (avatarUrl) => {
+    if (!avatarUrl || avatarUrl.trim() === '') {
+      return true;
+    }
+    
+    // Vérifier si c'est l'URL de l'avatar par défaut
+    return avatarUrl.includes('/avatars/default/default_avatar.jpg');
+  };
+
+  const showDeleteButton = !isDefaultAvatar(currentAvatar) && !isUploading;
 
   const handleFileSelect = async (event) => {
     const file = event.target.files[0];
@@ -155,8 +166,8 @@ const AvatarUpload = ({ currentAvatar, onAvatarChange, className = '' }) => {
         )}
       </div>
 
-      {/* Bouton de suppression */}
-      {preview && !isUploading && (
+      {/* Bouton de suppression - seulement si ce n'est PAS l'avatar par défaut */}
+      {showDeleteButton && (
         <button
           onClick={(e) => {
             e.stopPropagation();

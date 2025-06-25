@@ -1,5 +1,8 @@
-// backend/src/config/minio.js - VERSION CORRIGÉE POUR URLs PUBLIQUES
+// ===== 1. Modifier backend/src/config/minio.js =====
+
 const { Client } = require('minio');
+const path = require('path');
+const fs = require('fs');
 const logger = require('../utils/logger');
 
 const minioClient = new Client({
@@ -15,6 +18,55 @@ const BUCKETS = {
   IMAGES: 'images',
   VIDEOS: 'videos', 
   AVATARS: 'avatars'
+};
+
+// ✅ NOUVELLE FONCTION : Upload l'avatar par défaut
+const uploadDefaultAvatar = async () => {
+  try {
+    const defaultAvatarPath = path.join(__dirname, 'default_avatar.jpg');
+    const defaultAvatarName = 'default/default_avatar.jpg';
+
+    // Vérifier si l'avatar par défaut existe sur le disque
+    if (!fs.existsSync(defaultAvatarPath)) {
+      logger.warn(`❌ Avatar par défaut non trouvé: ${defaultAvatarPath}`);
+      return null;
+    }
+
+    // Vérifier si l'avatar par défaut existe déjà dans MinIO
+    try {
+      await minioClient.statObject(BUCKETS.AVATARS, defaultAvatarName);
+      logger.info('✅ Avatar par défaut existe déjà dans MinIO');
+      return getPublicUrl(BUCKETS.AVATARS, defaultAvatarName);
+    } catch (error) {
+      // L'avatar n'existe pas, on va l'uploader
+      logger.info('🔄 Upload de l\'avatar par défaut vers MinIO...');
+    }
+
+    // Lire le fichier
+    const fileBuffer = fs.readFileSync(defaultAvatarPath);
+    const fileStats = fs.statSync(defaultAvatarPath);
+
+    // Upload vers MinIO
+    await minioClient.putObject(
+      BUCKETS.AVATARS,
+      defaultAvatarName,
+      fileBuffer,
+      fileStats.size,
+      {
+        'Content-Type': 'image/jpeg',
+        'Cache-Control': 'public, max-age=86400'
+      }
+    );
+
+    const avatarUrl = getPublicUrl(BUCKETS.AVATARS, defaultAvatarName);
+    logger.info(`✅ Avatar par défaut uploadé avec succès: ${avatarUrl}`);
+    
+    return avatarUrl;
+
+  } catch (error) {
+    logger.error('❌ Erreur lors de l\'upload de l\'avatar par défaut:', error);
+    return null;
+  }
 };
 
 // Vérifier la connexion MinIO et créer les buckets si nécessaire
@@ -53,10 +105,24 @@ const initializeMinIO = async () => {
         logger.info(`✅ Bucket '${bucketName}' existe déjà`);
       }
     }
+
+    // ✅ NOUVEAU : Upload de l'avatar par défaut
+    const defaultAvatarUrl = await uploadDefaultAvatar();
+    if (defaultAvatarUrl) {
+      // Sauvegarder l'URL pour utilisation ultérieure
+      global.DEFAULT_AVATAR_URL = defaultAvatarUrl;
+      logger.info(`✅ Avatar par défaut disponible: ${defaultAvatarUrl}`);
+    }
+
   } catch (error) {
     logger.error('❌ Erreur lors de l\'initialisation MinIO:', error);
     throw error;
   }
+};
+
+// ✅ NOUVELLE FONCTION : Obtenir l'URL de l'avatar par défaut
+const getDefaultAvatarUrl = () => {
+  return global.DEFAULT_AVATAR_URL || getPublicUrl(BUCKETS.AVATARS, 'default/default_avatar.jpg');
 };
 
 // Fonction utilitaire pour générer un nom de fichier unique
@@ -102,5 +168,6 @@ module.exports = {
   initializeMinIO,
   generateFileName,
   getPublicUrl,
-  getPresignedUrl
+  getPresignedUrl,
+  getDefaultAvatarUrl
 };

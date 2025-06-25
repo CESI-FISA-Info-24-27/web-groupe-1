@@ -81,7 +81,6 @@ class AuthController {
             mail,
             password_hash,
             bio: `Salut ! 👋 Je suis ${prenom}, ravi de rejoindre la communauté ! 👋`,
-            photo_profil: null,
             id_role: userRole.id_role,
             private: false,
             certified: false,
@@ -560,7 +559,7 @@ class AuthController {
    */
   static async logout(req, res) {
     try {
-      const userId = req.user.userId;
+      const userId = req.user.id_user;
 
       // Optionnel : enregistrer la déconnexion en base
       await prisma.user.update({

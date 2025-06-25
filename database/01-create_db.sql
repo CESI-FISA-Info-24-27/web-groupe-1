@@ -74,7 +74,7 @@ CREATE TABLE cercle.users
  password_hash               VARCHAR(255) NOT NULL,
  telephone                   varchar(20) NULL,
  bio                         varchar(255) NULL,
- photo_profil                varchar(255) NULL,
+ photo_profil                varchar(255) DEFAULT 'http://localhost:9000/avatars/default/default_avatar.jpg',
  id_role                     int NOT NULL,
  "private"                   bool NOT NULL,
  certified                   bool NOT NULL,
