@@ -190,16 +190,7 @@ const AvatarUpload = ({ currentAvatar, onAvatarChange, className = '' }) => {
           </div>
         </div>
       )}
-
-      {/* Instructions */}
-      <div className="absolute top-full mt-2 left-0 right-0 text-center">
-        <p className="text-xs text-gray-500">
-          Cliquez pour changer votre avatar
-        </p>
-        <p className="text-xs text-gray-400">
-          JPEG, PNG, WebP - Max 5MB
-        </p>
-      </div>
+      
     </div>
   );
 };
