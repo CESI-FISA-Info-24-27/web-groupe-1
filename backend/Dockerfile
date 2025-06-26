@@ -1,22 +1,24 @@
-# Utiliser l'image de votre collègue qui contient déjà Sharp
-FROM matteoturc/theo-sharp:latest
+FROM node:18-alpine
+
+RUN apk update && apk upgrade
+RUN apk add --no-cache openssl
 
 WORKDIR /app
 
-# Copier package.json (avec Sharp inclus cette fois)
+# Copier package.json
 COPY package*.json ./
 
-# Installation complète (production + development)
+# Installer les dépendances
 RUN npm install
-
-# Installer spécifiquement les packages qui pourraient manquer
-RUN npm install bcryptjs nodemon --save
+RUN npm install pg
+RUN npm install nodemailer
+RUN npm install minio sharp
 
 # Copier le code source
 COPY . .
 
-# Générer Prisma
-RUN npx prisma generate
-
+# Exposer le port
 EXPOSE 3000
+
+# Utiliser CMD avec un tableau (pas de shell) - compatible Windows
 CMD ["npm", "run", "dev"]

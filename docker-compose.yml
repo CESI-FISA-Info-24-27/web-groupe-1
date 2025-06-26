@@ -80,7 +80,7 @@ services:
       "
     restart: "no"
 
-  # Backend API avec DEBUG
+  # Backend API
   backend:
     build:
       context: ./backend
@@ -124,10 +124,6 @@ services:
       MINIO_ENDPOINT: minio
       MINIO_API_PORT: ${MINIO_API_PORT}
       MINIO_USE_SSL: "false"
-      # Variables pour debug npm
-      NPM_CONFIG_LOGLEVEL: verbose
-      NPM_CONFIG_PROGRESS: "true"
-      DEBUG: "*"
     ports:
       - "${API_PORT}:${API_PORT}"
     depends_on:
@@ -139,34 +135,11 @@ services:
       - ./backend:/app
       - /app/node_modules
     restart: unless-stopped
-    # Entrypoint avec plus de logs et timeout plus long
-    entrypoint: >
-      /bin/sh -c "
-      echo '🔍 === DÉBUT DEBUG BACKEND ===';
-      echo '📊 Informations système:';
-      free -m || echo 'RAM info non disponible';
-      df -h || echo 'Disk info non disponible';
-      echo '🌐 Test connectivité npm:';
-      ping -c 3 registry.npmjs.org || echo 'Ping registry failed';
-      echo '📦 Configuration npm:';
-      npm config list;
-      echo '⏰ Sleep 15 secondes pour attendre les services...';
-      sleep 15;
-      echo '🔧 Génération Prisma...';
-      npx prisma generate --schema=/app/prisma/schema.prisma || echo 'Prisma generate failed';
-      echo '🚀 Démarrage de l application...';
-      npm run dev;
-      "
-    # Logging pour voir plus de détails
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
+    entrypoint: ["sh", "-c", "sleep 15 && npx prisma generate && npm run dev"]
     networks:
       - cercle_network
 
-  # Frontend React avec DEBUG
+  # Frontend React
   frontend:
     build:
       context: ./frontend
@@ -180,9 +153,6 @@ services:
       VITE_AVATAR_BASE_URL: ${AVATAR_BASE_URL}
       VITE_IMAGE_BASE_URL: ${IMAGE_BASE_URL}
       VITE_VIDEO_BASE_URL: ${VIDEO_BASE_URL}
-      # Variables pour debug npm
-      NPM_CONFIG_LOGLEVEL: verbose
-      NPM_CONFIG_PROGRESS: "true"
     ports:
       - "${FRONTEND_PORT}:${FRONTEND_PORT}"
     depends_on:
@@ -191,26 +161,7 @@ services:
       - ./frontend:/app
       - /app/node_modules
     restart: unless-stopped
-    # Command avec plus de logs
-    entrypoint: >
-      /bin/sh -c "
-      echo '🔍 === DÉBUT DEBUG FRONTEND ===';
-      echo '📊 Informations système:';
-      free -m || echo 'RAM info non disponible';
-      df -h || echo 'Disk info non disponible';
-      echo '🌐 Test connectivité npm:';
-      ping -c 3 registry.npmjs.org || echo 'Ping registry failed';
-      echo '📦 Configuration npm:';
-      npm config list;
-      echo '🚀 Démarrage Vite...';
-      npm run dev -- --host 0.0.0.0 --port ${FRONTEND_PORT};
-      "
-    # Logging pour voir plus de détails
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
+    command: npm run dev -- --host 0.0.0.0 --port ${FRONTEND_PORT}
     networks:
       - cercle_network
 
