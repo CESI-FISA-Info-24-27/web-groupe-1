@@ -94,7 +94,6 @@ const Parametres = () => {
           bio: formData.bio,
           nom: formData.nom,
           prenom: formData.prenom,
-          telephone: formData.telephone,
           private: formData.private
         })
       })
@@ -408,29 +407,6 @@ const Parametres = () => {
                         />
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{formData.bio.length}/160 caractères</p>
                       </div>
-                      
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Date de naissance</label>
-                        <input
-                          type="date"
-                          name="date_naissance"
-                          value={formData.date_naissance}
-                          onChange={handleInputChange}
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-black dark:focus:ring-white focus:border-transparent text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Téléphone</label>
-                        <input
-                          type="tel"
-                          name="telephone"
-                          value={formData.telephone}
-                          onChange={handleInputChange}
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-black dark:focus:ring-white focus:border-transparent text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                          placeholder="+33 1 23 45 67 89"
-                        />
-                      </div>
 
                       {/* Compte privé */}
                       <div className="flex items-center justify-between py-2">
@@ -479,21 +455,6 @@ const Parametres = () => {
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Date de naissance</label>
-                        <p className="text-sm text-gray-900 dark:text-gray-100 py-2">
-                          {user?.date_naissance 
-                            ? new Date(user.date_naissance).toLocaleDateString('fr-FR')
-                            : 'Non renseignée'
-                          }
-                        </p>
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Téléphone</label>
-                        <p className="text-sm text-gray-900 dark:text-gray-100 py-2">{user?.telephone || 'Non renseigné'}</p>
-                      </div>
-
-                      <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Type de compte</label>
                         <p className="text-sm text-gray-900 dark:text-gray-100 py-2">
                           {user?.private ? 'Privé' : 'Public'}
@@ -516,21 +477,6 @@ const Parametres = () => {
                         <div>
                           <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Changer le mot de passe</p>
                           <p className="text-xs text-gray-500 dark:text-gray-400">Dernière modification il y a 3 mois</p>
-                        </div>
-                        <svg className="w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                        </svg>
-                      </div>
-                    </button>
-                    
-                    <button 
-                      onClick={handleDelete2FA}
-                      className="w-full text-left p-3 rounded-lg border border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Authentification à deux facteurs</p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">Sécurisez votre compte</p>
                         </div>
                         <svg className="w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
