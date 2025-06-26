@@ -10,28 +10,25 @@ const useFeedStore = create(
       error: null,
       pagination: {
         page: 1,
-        limit: 50, // ✅ MODIFIÉ: Augmenté de 20 à 50 tweets par page
+        limit: 50,
         hasNext: false,
         total: 0,
-        maxPosts: 200 // ✅ NOUVEAU: Limite maximale de posts en mémoire
+        maxPosts: 200
       },
       pendingLikes: new Set(),
-      feedFilter: 'recent', // 'recent', 'friends', 'popular'
+      feedFilter: 'recent',
 
       // Actions pour les posts
       setPosts: (posts) => set({ posts }),
       
-      // ✅ MODIFIÉ: Limiter le nombre total de posts
       addPosts: (newPosts) => set((state) => {
         const allPosts = [...state.posts, ...newPosts];
-        // Garder seulement les 200 derniers posts
         const limitedPosts = allPosts.slice(0, state.pagination.maxPosts);
         return { posts: limitedPosts };
       }),
       
       prependPost: (post) => set((state) => {
         const newPosts = [post, ...state.posts];
-        // Garder seulement les 200 derniers posts
         const limitedPosts = newPosts.slice(0, state.pagination.maxPosts);
         return { posts: limitedPosts };
       }),
@@ -99,13 +96,11 @@ const useFeedStore = create(
 
         let response = await fetch(url, config);
 
-        // ✅ Gestion automatique des 401
         if (response.status === 401) {
           console.log('🔄 Token expiré, tentative de refresh...');
           
           try {
             const newToken = await handleTokenExpiry();
-            // Refaire la requête avec le nouveau token
             config.headers['Authorization'] = `Bearer ${newToken}`;
             response = await fetch(url, config);
           } catch (refreshError) {
@@ -179,7 +174,7 @@ const useFeedStore = create(
         })
       })),
 
-      // ✅ CHARGER LES POSTS AVEC GESTION 401 ET LIMITE AUGMENTÉE
+      // ✅ CHARGER LES POSTS
       fetchPosts: async (reset = false, page = 1) => {
         const { 
           setLoading, 
@@ -196,18 +191,16 @@ const useFeedStore = create(
         setError(null);
 
         try {
-          // ✅ CORRECTION CRITIQUE: Endpoints corrigés
           const endpoints = {
-            recent: '/api/v1/posts/public',              // ✅ Posts publics
-            friends: '/api/v1/posts/timeline/personal',  // ✅ Posts des amis
-            popular: '/api/v1/posts/trending'            // ✅ Posts populaires
+            recent: '/api/v1/posts/public',
+            friends: '/api/v1/posts/timeline/personal',
+            popular: '/api/v1/posts/trending'
           };
 
           const endpoint = endpoints[feedFilter] || endpoints.recent;
           
           console.log(`🔍 Fetching from: ${endpoint} (filter: ${feedFilter})`);
           
-          // ✅ MODIFIÉ: Utiliser la nouvelle limite de 50 au lieu de 20
           const response = await authenticatedFetch(`${endpoint}?page=${page}&limit=${pagination.limit}`);
 
           if (!response.ok) {
@@ -222,40 +215,31 @@ const useFeedStore = create(
           console.log(`✅ Posts récupérés:`, {
             count: newPosts.length,
             endpoint,
-            totalInMemory: reset ? newPosts.length : get().posts.length + newPosts.length,
-            maxAllowed: pagination.maxPosts,
             posts: newPosts.map(p => ({
               id: p.id_post,
               author: p.author?.username,
-              content: p.content?.substring(0, 50) + '...'
+              liked: p.isLikedByCurrentUser || p.isLiked,
+              likeCount: p.likeCount || p.likesCount
             }))
           });
 
           if (reset) {
             setPosts(newPosts);
           } else {
-            // ✅ addPosts va automatiquement limiter à 200 posts
             addPosts(newPosts);
           }
 
-          // ✅ MODIFIÉ: Arrêter le chargement si on atteint 200 posts
           const currentPostCount = reset ? newPosts.length : get().posts.length;
-          const shouldStopLoading = currentPostCount >= pagination.maxPosts;
-
+          
           setPagination({
-            page: data.pagination?.page || page,
-            limit: data.pagination?.limit || pagination.limit,
-            hasNext: (data.pagination?.hasNext || false) && !shouldStopLoading,
-            total: Math.min(data.pagination?.total || 0, pagination.maxPosts)
+            ...pagination,
+            page: reset ? 1 : page,
+            hasNext: newPosts.length === pagination.limit && currentPostCount < pagination.maxPosts,
+            total: data.total || 0
           });
 
-          // ✅ Message informatif quand on atteint la limite
-          if (shouldStopLoading && currentPostCount >= pagination.maxPosts) {
-            console.log(`📊 Limite de ${pagination.maxPosts} posts atteinte. Arrêt du chargement.`);
-          }
-
         } catch (error) {
-          console.error('❌ Erreur chargement posts:', error);
+          console.error('❌ Erreur fetchPosts:', error);
           setError(error.message);
         } finally {
           setLoading(false);
@@ -283,7 +267,7 @@ const useFeedStore = create(
           }
 
           const data = await response.json();
-          prependPost(data.post); // ✅ prependPost va automatiquement limiter à 200
+          prependPost(data.post);
           
           console.log('✅ Post créé avec succès');
           return { success: true, post: data.post };
@@ -295,7 +279,7 @@ const useFeedStore = create(
         }
       },
 
-      // ✅ LIKE/UNLIKE avec gestion 401
+      // ✅ LIKE/UNLIKE
       toggleLike: async (postId) => {
         const { 
           pendingLikes, 
@@ -341,12 +325,12 @@ const useFeedStore = create(
         }
       },
 
-      // Nettoyer le store (lors de la déconnexion)
+      // Nettoyer le store
       clearFeed: () => set({
         posts: [],
         isLoading: false,
         error: null,
-        pagination: { page: 1, limit: 50, hasNext: false, total: 0, maxPosts: 200 }, // ✅ MODIFIÉ
+        pagination: { page: 1, limit: 50, hasNext: false, total: 0, maxPosts: 200 },
         pendingLikes: new Set(),
         feedFilter: 'recent'
       })
@@ -355,10 +339,11 @@ const useFeedStore = create(
       name: 'feed-storage',
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
-        posts: state.posts,
-        feedFilter: state.feedFilter,
+        // ✅ CORRECTION CRITIQUE: Ne plus persister les posts pour éviter les problèmes de likes
+        feedFilter: state.feedFilter
+        // posts: state.posts, // RETIRÉ - les posts ne sont plus persistés
       }),
-      version: 2, // ✅ MODIFIÉ: Incrémenté pour forcer la migration
+      version: 3, // Incrémenté pour forcer la migration
     }
   )
 );
