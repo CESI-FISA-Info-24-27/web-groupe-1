@@ -33,7 +33,18 @@ const updateProfileSchema = Joi.object({
     .messages({
       'string.max': 'First name must not exceed 50 characters'
     }),
-    
+
+  username: Joi.string()
+    .alphanum()
+    .min(2)
+    .max(50)
+    .optional()
+    .messages({
+      'string.alphanum': 'Username must contain only alphanumeric characters',
+      'string.min': 'Username must be at least 2 characters long',
+      'string.max': 'Username must not exceed 50 characters'
+    }),
+
   telephone: Joi.string()
     .pattern(/^[\+]?[\d\s\-\(\)]+$/)
     .max(20)

@@ -94,6 +94,7 @@ const Parametres = () => {
           bio: formData.bio,
           nom: formData.nom,
           prenom: formData.prenom,
+          username: formData.username,
           private: formData.private
         })
       })
