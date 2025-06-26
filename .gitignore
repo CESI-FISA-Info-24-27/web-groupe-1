@@ -1,24 +1,348 @@
-# Logs
-logs
-*.log
+# =================================================================
+# .gitignore pour Social Network API (Node.js + PostgreSQL + Docker)
+# =================================================================
+
+# =================================================================
+# SÉCURITÉ CRITIQUE - Fichiers sensibles
+# =================================================================
+.env
+.env.*
+!.env.example
+!.env.template
+*.key
+*.pem
+*.p12
+*.pfx
+*.crt
+*.csr
+secrets.json
+config/production.json
+config/local.json
+
+# JWT secrets
+jwt-secret.txt
+refresh-secret.txt
+
+# SSH keys
+id_rsa
+id_rsa.pub
+id_ed25519
+id_ed25519.pub
+
+# =================================================================
+# Node.js & NPM
+# =================================================================
+# Dependencies
+node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
-*.local
+# Package lock files (gardez seulement celui que vous utilisez)
+yarn.lock
+pnpm-lock.yaml
 
-# Editor directories and files
-.vscode/*
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Cache
+.npm
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+.pnp.*
+.node_repl_history
+
+# Optional caches
+.eslintcache
+.stylelintcache
+
+# Output of 'npm pack'
+*.tgz
+
+# =================================================================
+# Base de données & Prisma
+# =================================================================
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Prisma
+prisma/dev.db
+prisma/test.db
+prisma/migrations/**/migration.sql
+
+# PostgreSQL data & dumps
+postgresql/
+pg_data/
+postgres_data/
+pgadmin_data/
+pgadmin/
+*.sql.backup
+*.dump
+*.backup
+backup*.sql
+dump*.sql
+*.backup.sql
+
+# =================================================================
+# Logs & Monitoring
+# =================================================================
+# Application logs
+logs/
+*.log
+.pm2/
+
+# New Relic
+newrelic.js
+newrelic_agent.log
+
+# Sentry
+.sentryclirc
+
+# =================================================================
+# Docker & Containers
+# =================================================================
+# Docker volumes et données
+docker-data/
+volumes/
+
+# Docker Compose override
+docker-compose.override.yml
+docker-compose.local.yml
+.docker/
+
+# =================================================================
+# Uploads & Media & Temporary
+# =================================================================
+# User uploads
+uploads/*
+!uploads/.gitkeep
+public/uploads/
+static/uploads/
+media/
+public/media/
+storage/
+files/
+attachments/
+
+# Temporary files
+tmp/
+temp/
+.tmp/
+
+# =================================================================
+# Build & Compilation
+# =================================================================
+# Build outputs
+build/
+dist/
+out/
+build/Release
+
+# TypeScript
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+
+# Webpack & bundlers
+.webpack/
+.cache/
+.parcel-cache/
+
+# React/Frontend specific
+storybook-static/
+.storybook-out
+bundle-report.html
+
+# Next.js
+.next/
+
+# Nuxt.js
+.nuxt/
+
+# Gatsby
+.cache/
+
+# SvelteKit
+.svelte-kit
+
+# Vite
+.vite/
+
+# =================================================================
+# Testing
+# =================================================================
+# Coverage
+coverage/
+*.lcov
+.nyc_output
+jest-coverage/
+
+# Test results
+test-results/
+junit.xml
+
+# Cypress
+cypress/videos/
+cypress/screenshots/
+cypress/downloads/
+
+# Playwright
+playwright-report/
+playwright/.cache/
+
+# =================================================================
+# Development & IDE
+# =================================================================
+# VS Code
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
 !.vscode/extensions.json
-.idea
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# =================================================================
+# OS & System Files
+# =================================================================
+# macOS
 .DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
+.DS_Store?
+._*
+.AppleDouble
+.LSOverride
+Icon?
+.Spotlight-V100
+.Trashes
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Linux
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# =================================================================
+# Déploiement & Production
+# =================================================================
+# Cloud platforms
+.vercel
+.netlify
+.railway
+
+# Process managers
+ecosystem.config.js
+
+# Serverless
+.serverless/
+
+# Infrastructure as Code
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+*.kubeconfig
+*.retry
+
+# =================================================================
+# Archives & Backups
+# =================================================================
+*.zip
+*.tar.gz
+*.rar
+*.7z
+*.bak
+*.backup
+*.old
+*.orig
+backup/
+backups/
+backup-*
+*-backup.*
+
+# =================================================================
+# Documentation & Reports
+# =================================================================
+# Generated documentation
+docs/build/
+docs/_build/
+doc/build/
+api-docs/
+
+# Performance monitoring
+lighthouse-reports/
+performance/
+
+# =================================================================
+# Project Specific
+# =================================================================
+# Custom scripts avec données sensibles
+scripts/production/
+scripts/deploy/
+
+# Local development helpers
+dev-helpers/
+local-scripts/
+test-data/
+mock-data/
+
+# Custom logs
+app-logs/
+error-logs/
+access-logs/
+
+# Migrations temporaires
+migrations/temp/
+
+# Miscellaneous cache
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
+
+# Grunt
+.grunt
+bower_components
+lib-cov
