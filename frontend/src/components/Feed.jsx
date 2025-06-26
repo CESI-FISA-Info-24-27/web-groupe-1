@@ -1,4 +1,4 @@
-// src/components/Feed.jsx - Version complète avec animations fluides pour la modal
+// src/components/Feed.jsx - Version complète avec corrections des 3 bugs
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
@@ -54,8 +54,17 @@ const Feed = () => {
   const [isPostingComment, setIsPostingComment] = useState({});
   const [comments, setComments] = useState({});
   
+  // ✅ NOUVEAU : États pour les signalements
+  const [showDropdown, setShowDropdown] = useState({});
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [selectedPostForReport, setSelectedPostForReport] = useState(null);
+  const [reportReason, setReportReason] = useState('');
+  const [isReporting, setIsReporting] = useState(false);
+  
   const postBoxRef = useRef(null);
   const scrollRef = useRef(null);
+  const emojiPickerRef = useRef(null);
+  const dropdownRef = useRef(null);
 
   console.log('🎯 Feed state:', { 
     postsCount: posts.length, 
@@ -63,6 +72,63 @@ const Feed = () => {
     error, 
     feedFilter 
   });
+
+  // ✅ FIX 1: EMOJI PICKER - Simple emoji picker fonctionnel
+  const emojis = ['😀', '😂', '😍', '🤔', '😎', '🔥', '❤️', '👍', '👎', '😢', '😡', '🎉', '💯', '👌', '🙌', '✨'];
+  
+  const handleEmojiClick = (emoji) => {
+    setNewPost(prev => prev + emoji);
+    setShowEmojiPicker(false);
+  };
+
+  // ✅ NOUVEAU : Fonction pour obtenir l'état d'un post depuis le store
+  const getPostFromStore = (postId) => {
+    return posts.find(p => p.id_post === parseInt(postId));
+  };
+  // ✅ LIKE - Exactement comme PostDetail mais plus simple
+  const handleLike = async (postId) => {
+    if (pendingLikes.has(postId)) return;
+    
+    console.log('🔄 Clicking like for post:', postId);
+    
+    try {
+      // ✅ Utiliser toggleLike du store (comme PostDetail)
+      await toggleLike(postId);
+      
+      console.log('✅ Like action completed');
+      
+    } catch (error) {
+      console.error('❌ Erreur toggle like:', error);
+    }
+  };
+
+  // ✅ NOUVEAU : Fonction pour synchroniser les likes entre Feed et PostDetail
+  const syncPostWithStore = (postId, updatedPost) => {
+    const { syncLikeFromServer } = useFeedStore.getState();
+    // Mettre à jour le store avec les nouvelles données
+    syncLikeFromServer(postId, {
+      isLiked: updatedPost.isLiked || updatedPost.isLikedByCurrentUser,
+      likeCount: updatedPost.likeCount || updatedPost.likesCount
+    });
+  };
+
+  // Fermer l'emoji picker quand on clique ailleurs
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (emojiPickerRef.current && !emojiPickerRef.current.contains(event.target)) {
+        setShowEmojiPicker(false);
+      }
+      // Fermer les dropdowns des posts
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setShowDropdown({});
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   // ✅ AMÉLIORATION : Fonctions d'animation pour la modal
   const openModal = () => {
@@ -79,6 +145,7 @@ const Feed = () => {
       setShowPostModal(false);
       setModalAnimating(false);
       setNewPost('');
+      setShowEmojiPicker(false);
     }, 200);
   };
 
@@ -186,6 +253,13 @@ const Feed = () => {
     }
   }, [feedFilter, user?.id_user, fetchPosts, clearFeed]);
 
+  // ✅ CORRECTION : Forcer la resynchronisation des posts depuis le store au chargement
+  useEffect(() => {
+    // Forcer le re-render avec les données du store au chargement de la page
+    const { posts: storedPosts } = useFeedStore.getState();
+    console.log('🔄 Posts from store on page load:', storedPosts.length);
+  }, []);
+
   // ✅ AMÉLIORATION : CRÉATION DE POST avec animation de fermeture
   const handleCreatePost = async () => {
     if (!newPost.trim() || isPosting) return;
@@ -212,12 +286,110 @@ const Feed = () => {
     }
   };
 
-  // ✅ LIKE - Ultra simple avec le store !
-  const handleLike = (postId) => {
-    toggleLike(postId);
+  // ✅ NOUVEAU : Fonctions pour les signalements
+  const reportCategories = [
+    { id: 'spam', name: 'Spam', description: 'Contenu promotionnel non désiré ou répétitif' },
+    { id: 'hate', name: 'Discours de haine', description: 'Contenu qui promeut la haine' },
+    { id: 'violence', name: 'Violence et menaces', description: 'Contenu violent ou menaçant' },
+    { id: 'harassment', name: 'Harcèlement', description: 'Harcèlement ou intimidation' },
+    { id: 'misinformation', name: 'Désinformation', description: 'Informations fausses ou trompeuses' },
+    { id: 'other', name: 'Autre', description: 'Autre violation des règles' }
+  ];
+
+  const handleReportPost = (post) => {
+    console.log('🚨 handleReportPost called with post:', post);
+    console.log('🚨 Setting selectedPostForReport to:', post);
+    console.log('🚨 Setting showReportModal to true');
+    
+    setSelectedPostForReport(post);
+    setShowReportModal(true);
+    setShowDropdown({});
+    
+    // Log pour vérifier les états après update
+    setTimeout(() => {
+      console.log('🚨 State after update - showReportModal:', showReportModal);
+      console.log('🚨 State after update - selectedPostForReport:', selectedPostForReport);
+    }, 100);
   };
 
-  // Fonction pour gérer les commentaires
+  const submitReport = async () => {
+    if (!selectedPostForReport || !reportReason || isReporting) return;
+
+    try {
+      setIsReporting(true);
+      const token = localStorage.getItem('accessToken');
+      
+      console.log('🚨 Reporting post:', selectedPostForReport.id_post, 'Reason:', reportReason);
+      
+      const response = await fetch(`/api/v1/reports/posts/${selectedPostForReport.id_post}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ raison: reportReason })
+      });
+
+      console.log('📡 Report response status:', response.status);
+
+      if (response.ok) {
+        console.log('✅ Post reported successfully');
+        
+        // Afficher une notification de succès en haut
+        const notification = document.createElement('div');
+        notification.textContent = 'Post signalé';
+        notification.style.cssText = `
+          position: fixed;
+          top: 20px;
+          left: 50%;
+          transform: translateX(-50%);
+          background: #10b981;
+          color: white;
+          padding: 12px 24px;
+          border-radius: 8px;
+          font-size: 14px;
+          font-weight: 500;
+          z-index: 9999;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+          animation: slideDown 0.3s ease-out;
+        `;
+        
+        // Ajouter l'animation CSS
+        const style = document.createElement('style');
+        style.textContent = `
+          @keyframes slideDown {
+            from { transform: translateX(-50%) translateY(-100%); opacity: 0; }
+            to { transform: translateX(-50%) translateY(0); opacity: 1; }
+          }
+        `;
+        document.head.appendChild(style);
+        
+        document.body.appendChild(notification);
+        
+        // Supprimer après 3 secondes
+        setTimeout(() => {
+          notification.remove();
+          style.remove();
+        }, 3000);
+        
+        // Fermer la modal
+        setShowReportModal(false);
+        setSelectedPostForReport(null);
+        setReportReason('');
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('❌ Report error:', response.status, errorData);
+        setError('Erreur lors du signalement');
+      }
+    } catch (error) {
+      console.error('❌ Error reporting post:', error);
+      setError('Erreur de connexion lors du signalement');
+    } finally {
+      setIsReporting(false);
+    }
+  };
+
+  // ✅ FIX 3: COMMENTAIRES - Fonction corrigée pour gérer les commentaires
   const handleToggleComments = async (postId) => {
     if (showComments[postId]) {
       setShowComments(prev => ({ ...prev, [postId]: false }));
@@ -226,7 +398,10 @@ const Feed = () => {
 
     try {
       const token = localStorage.getItem('accessToken');
-      const response = await fetch(`/api/v1/posts/${postId}/comments`, {
+      console.log('🔄 Fetching comments for post:', postId);
+      
+      // ✅ CORRECTION: Utiliser le bon endpoint /replies au lieu de /reply
+      const response = await fetch(`/api/v1/posts/${postId}/replies`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -235,15 +410,33 @@ const Feed = () => {
 
       if (response.ok) {
         const commentsData = await response.json();
-        setComments(prev => ({ ...prev, [postId]: commentsData }));
+        console.log('✅ Comments loaded:', commentsData);
+        
+        // L'API renvoie soit un array directement, soit dans data/posts/replies
+        let commentsArray = [];
+        if (Array.isArray(commentsData)) {
+          commentsArray = commentsData;
+        } else if (commentsData.replies && Array.isArray(commentsData.replies)) {
+          commentsArray = commentsData.replies;
+        } else if (commentsData.data && Array.isArray(commentsData.data)) {
+          commentsArray = commentsData.data;
+        } else if (commentsData.posts && Array.isArray(commentsData.posts)) {
+          commentsArray = commentsData.posts;
+        }
+        
+        setComments(prev => ({ ...prev, [postId]: commentsArray }));
         setShowComments(prev => ({ ...prev, [postId]: true }));
+      } else {
+        console.error('❌ Error fetching comments:', response.status);
+        setError('Erreur lors du chargement des commentaires');
       }
     } catch (error) {
       console.error('❌ Error fetching comments:', error);
+      setError('Erreur de connexion lors du chargement des commentaires');
     }
   };
 
-  // Fonction pour poster un commentaire
+  // ✅ FIX 3: COMMENTAIRES - Fonction pour poster un commentaire
   const handlePostComment = async (postId) => {
     const commentText = newComment[postId];
     if (!commentText || !commentText.trim()) return;
@@ -252,7 +445,10 @@ const Feed = () => {
       setIsPostingComment(prev => ({ ...prev, [postId]: true }));
       const token = localStorage.getItem('accessToken');
       
-      const response = await fetch(`/api/v1/posts/${postId}/comments`, {
+      console.log('🔄 Posting comment to post:', postId);
+      
+      // ✅ CORRECTION: Utiliser l'endpoint /reply (POST) pour créer un commentaire
+      const response = await fetch(`/api/v1/posts/${postId}/reply`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -263,11 +459,17 @@ const Feed = () => {
 
       if (response.ok) {
         const newCommentData = await response.json();
+        console.log('✅ Comment posted successfully:', newCommentData);
+        
+        // L'API renvoie soit reply, soit post
+        const comment = newCommentData.reply || newCommentData.post || newCommentData;
+        
         setComments(prev => ({
           ...prev,
-          [postId]: [...(prev[postId] || []), newCommentData]
+          [postId]: [...(prev[postId] || []), comment]
         }));
         setNewComment(prev => ({ ...prev, [postId]: '' }));
+        
         console.log('💬 Comment created successfully');
       } else {
         const errorData = await response.json().catch(() => ({}));
@@ -602,27 +804,38 @@ const Feed = () => {
                         ref={postBoxRef}
                       />
                       <div className="flex items-center justify-between mt-4">
-                        <div className="flex items-center space-x-3">
-                          <button 
-                            type="button"
-                            className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors"
-                            title="Ajouter une image"
-                          >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                            </svg>
-                          </button>
-                          
-                          <button 
-                            type="button"
-                            onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                            className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors"
-                            title="Ajouter un emoji"
-                          >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                          </button>
+                        <div className="flex items-center space-x-3 relative">
+                          {/* ✅ FIX 1: EMOJI PICKER */}
+                          <div className="relative" ref={emojiPickerRef}>
+                            <button 
+                              type="button"
+                              onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                              className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors"
+                              title="Ajouter un emoji"
+                            >
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                            </button>
+                            
+                            {/* ✅ FIX 1: EMOJI PICKER - Affichage des emojis */}
+                            {showEmojiPicker && (
+                              <div className="absolute bottom-full left-0 mb-2 bg-white border border-gray-200 rounded-lg shadow-xl p-3 z-50 min-w-max">
+                                <div className="grid grid-cols-4 gap-1">
+                                  {emojis.map((emoji, index) => (
+                                    <button
+                                      key={index}
+                                      onClick={() => handleEmojiClick(emoji)}
+                                      className="w-10 h-10 text-xl hover:bg-gray-100 rounded-lg transition-colors flex items-center justify-center hover:scale-110 transform duration-150"
+                                      title={emoji}
+                                    >
+                                      {emoji}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
                         </div>
                         
                         <div className="flex items-center space-x-3">
@@ -711,17 +924,65 @@ const Feed = () => {
                             </div>
                             
                             <div className="flex-1 min-w-0">
-                              <div className="flex items-center space-x-2">
-                                <h3 
-                                  className="font-semibold text-gray-900 cursor-pointer hover:underline"
-                                  onClick={() => navigate(`/profile/${post.author?.id_user || post.user?.id_user}`)}
-                                >
-                                  {post.author?.username || post.user?.username}
-                                </h3>
-                                {(post.author?.certified || post.user?.certified) && (
-                                  <svg className="w-5 h-5 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                                  </svg>
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center space-x-2">
+                                  <h3 
+                                    className="font-semibold text-gray-900 cursor-pointer hover:underline"
+                                    onClick={() => navigate(`/profile/${post.author?.id_user || post.user?.id_user}`)}
+                                  >
+                                    {post.author?.username || post.user?.username}
+                                  </h3>
+                                  {(post.author?.certified || post.user?.certified) && (
+                                    <svg className="w-5 h-5 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
+                                      <path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                    </svg>
+                                  )}
+                                </div>
+                                
+                                {/* ✅ NOUVEAU : Menu 3 points pour signaler */}
+                                {user?.id_user !== (post.author?.id_user || post.user?.id_user) && (
+                                  <div className="relative" ref={dropdownRef}>
+                                    <button
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        console.log('🚨 3-dots button clicked for post:', post.id_post);
+                                        console.log('🚨 Current showDropdown state:', showDropdown);
+                                        setShowDropdown(prev => ({ 
+                                          ...Object.keys(prev).reduce((acc, key) => ({ ...acc, [key]: false }), {}),
+                                          [post.id_post]: !prev[post.id_post] 
+                                        }));
+                                      }}
+                                      className="p-1 rounded-full hover:bg-gray-100 transition-colors"
+                                      title="Plus d'options"
+                                    >
+                                      <svg className="w-4 h-4 text-gray-500" fill="currentColor" viewBox="0 0 20 20">
+                                        <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+                                      </svg>
+                                    </button>
+                                    
+                                    {/* Dropdown menu */}
+                                    {showDropdown[post.id_post] && (
+                                      <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-40 min-w-48">
+                                        {console.log('🚨 Dropdown is showing for post:', post.id_post)}
+                                        <button
+                                          onClick={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            console.log('🚨 Report button clicked for post:', post.id_post);
+                                            console.log('🚨 Post object:', post);
+                                            handleReportPost(post);
+                                          }}
+                                          className="w-full text-left px-4 py-3 text-sm text-red-600 hover:bg-red-50 flex items-center space-x-2 rounded-lg transition-colors"
+                                        >
+                                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                                          </svg>
+                                          <span>Signaler ce post</span>
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
                                 )}
                               </div>
                               
@@ -750,22 +1011,28 @@ const Feed = () => {
                                 onClick={() => handleLike(post.id_post)}
                                 disabled={pendingLikes.has(post.id_post)}
                                 className={`flex items-center space-x-2 transition-colors ${
-                                  post.isLikedByCurrentUser
+                                  post.isLikedByCurrentUser || post.isLiked || post.liked
                                     ? 'text-red-500 hover:text-red-600'
                                     : 'text-gray-500 hover:text-red-500'
                                 } ${pendingLikes.has(post.id_post) ? 'opacity-50' : ''}`}
                               >
                                 <svg 
-                                  className={`w-5 h-5 transition-all ${
-                                    post.isLikedByCurrentUser ? 'fill-current scale-110' : ''
+                                  className={`w-5 h-5 transition-all duration-200 ${
+                                    post.isLikedByCurrentUser || post.isLiked || post.liked ? 'fill-current scale-110' : ''
                                   }`}
-                                  fill={post.isLikedByCurrentUser ? "currentColor" : "none"}
+                                  fill={post.isLikedByCurrentUser || post.isLiked || post.liked ? "currentColor" : "none"}
                                   stroke="currentColor" 
                                   viewBox="0 0 24 24"
                                 >
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                                 </svg>
                                 <span>{post.likeCount || post.likesCount || 0}</span>
+                                {/* ✅ DEBUG : Afficher les propriétés pour diagnostiquer */}
+                                {process.env.NODE_ENV === 'development' && (
+                                  <span className="text-xs bg-gray-100 px-1 rounded">
+                                    {post.isLikedByCurrentUser ? 'LC' : ''}{post.isLiked ? 'L' : ''}{post.liked ? 'LD' : ''}
+                                  </span>
+                                )}
                               </button>
 
                               {/* Commentaires */}
@@ -776,7 +1043,7 @@ const Feed = () => {
                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                                 </svg>
-                                <span>{post.commentCount || 0}</span>
+                                <span>{post.commentCount || post.replyCount || post._count?.replies || 0}</span>
                               </button>
                             </div>
 
@@ -793,7 +1060,7 @@ const Feed = () => {
                           </div>
                         </div>
 
-                        {/* Section commentaires - Conservée de votre code original */}
+                        {/* ✅ FIX 3: Section commentaires - Corrigée et fonctionnelle */}
                         {showComments[post.id_post] && (
                           <div className="border-t border-gray-100 bg-gray-50">
                             <div className="p-6">
@@ -839,21 +1106,25 @@ const Feed = () => {
                               {/* Liste des commentaires */}
                               <div className="space-y-4">
                                 {(comments[post.id_post] || []).map((comment, commentIndex) => (
-                                  <div key={comment.id_comment || commentIndex} className="flex space-x-3">
+                                  <div key={comment.id_post || comment.id_comment || commentIndex} className="flex space-x-3">
                                     <div 
                                       className={`w-8 h-8 rounded-full overflow-hidden bg-gradient-to-br ${getRandomGradient(commentIndex + 2)} flex items-center justify-center text-white text-xs font-bold flex-shrink-0`}
                                     >
-                                      {comment.author?.photo_profil ? (
-                                        <img src={comment.author.photo_profil} alt="Profil" className="w-full h-full object-cover" />
+                                      {comment.author?.photo_profil || comment.user?.photo_profil ? (
+                                        <img 
+                                          src={comment.author?.photo_profil || comment.user?.photo_profil} 
+                                          alt="Profil" 
+                                          className="w-full h-full object-cover" 
+                                        />
                                       ) : (
-                                        (comment.author?.username || 'U').charAt(0).toUpperCase()
+                                        (comment.author?.username || comment.user?.username || 'U').charAt(0).toUpperCase()
                                       )}
                                     </div>
                                     <div className="flex-1">
                                       <div className="bg-white rounded-lg p-3 border border-gray-200">
                                         <div className="flex items-center space-x-2 mb-1">
                                           <span className="font-medium text-gray-900 text-sm">
-                                            {comment.author?.username}
+                                            {comment.author?.username || comment.user?.username}
                                           </span>
                                           <span className="text-xs text-gray-500">
                                             {formatDate(comment.created_at)}
@@ -866,6 +1137,14 @@ const Feed = () => {
                                     </div>
                                   </div>
                                 ))}
+                                
+                                {/* Message si aucun commentaire */}
+                                {comments[post.id_post] && comments[post.id_post].length === 0 && (
+                                  <div className="text-center py-4">
+                                    <p className="text-gray-500 text-sm">Aucun commentaire pour le moment</p>
+                                    <p className="text-gray-400 text-xs">Soyez le premier à commenter !</p>
+                                  </div>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -997,28 +1276,38 @@ const Feed = () => {
                         <div className={`flex items-center justify-between mt-3 transition-all duration-300 delay-200 ${
                           modalAnimating ? 'opacity-0 transform translate-y-2' : 'opacity-100 transform translate-y-0'
                         }`}>
-                          <div className="flex items-center space-x-3">
-                            {/* Boutons d'options avec hover amélioré */}
-                            <button 
-                              type="button"
-                              className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-all duration-200 hover:scale-110"
-                              title="Ajouter une image"
-                            >
-                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                              </svg>
-                            </button>
-                            
-                            <button 
-                              type="button"
-                              onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                              className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-all duration-200 hover:scale-110"
-                              title="Ajouter un emoji"
-                            >
-                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                              </svg>
-                            </button>
+                          <div className="flex items-center space-x-3 relative">
+                            {/* ✅ FIX 1: EMOJI PICKER dans la modal */}
+                            <div className="relative" ref={emojiPickerRef}>
+                              <button 
+                                type="button"
+                                onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                                className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-all duration-200 hover:scale-110"
+                                title="Ajouter un emoji"
+                              >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                              </button>
+                              
+                              {/* ✅ FIX 1: EMOJI PICKER - Affichage des emojis dans la modal */}
+                              {showEmojiPicker && (
+                                <div className="absolute bottom-full left-0 mb-2 bg-white border border-gray-200 rounded-lg shadow-xl p-3 z-50 min-w-max">
+                                  <div className="grid grid-cols-4 gap-1">
+                                    {emojis.map((emoji, index) => (
+                                      <button
+                                        key={index}
+                                        onClick={() => handleEmojiClick(emoji)}
+                                        className="w-10 h-10 text-xl hover:bg-gray-100 rounded-lg transition-colors flex items-center justify-center hover:scale-110 transform duration-150"
+                                        title={emoji}
+                                      >
+                                        {emoji}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
                           </div>
                           
                           {/* Compteur et bouton publier */}
@@ -1053,6 +1342,118 @@ const Feed = () => {
                         </div>
                       </div>
                     </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ✅ NOUVEAU : Modal de signalement */}
+          {showReportModal && selectedPostForReport && (
+            <div className="fixed inset-0 z-50 overflow-y-auto">
+              {console.log('🚨 Rendering report modal - showReportModal:', showReportModal, 'selectedPost:', selectedPostForReport)}
+              <div className="flex items-center justify-center min-h-screen px-4 py-6">
+                <div 
+                  className="fixed inset-0 bg-black bg-opacity-50 transition-opacity" 
+                  onClick={() => {
+                    console.log('🚨 Modal overlay clicked - closing modal');
+                    setShowReportModal(false);
+                    setSelectedPostForReport(null);
+                    setReportReason('');
+                  }}
+                ></div>
+                
+                <div className="relative bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold text-gray-900">Signaler ce post</h3>
+                    <button
+                      onClick={() => {
+                        console.log('🚨 Close button clicked');
+                        setShowReportModal(false);
+                        setSelectedPostForReport(null);
+                        setReportReason('');
+                      }}
+                      className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+                    >
+                      <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+
+                  <div className="mb-4">
+                    <p className="text-sm text-gray-600 mb-3">
+                      Pourquoi signalez-vous ce contenu ? Votre signalement nous aide à maintenir une communauté sûre.
+                    </p>
+                    
+                    {/* Aperçu du post signalé */}
+                    <div className="bg-gray-50 rounded-lg p-3 mb-4">
+                      <div className="flex items-center space-x-2 mb-2">
+                        <span className="font-medium text-sm text-gray-900">
+                          {selectedPostForReport.author?.username || selectedPostForReport.user?.username}
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          {formatDate(selectedPostForReport.created_at)}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-700 line-clamp-2">
+                        {selectedPostForReport.content}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 mb-6">
+                    {reportCategories.map((category) => (
+                      <label key={category.id} className="flex items-start space-x-3 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="reportReason"
+                          value={category.id}
+                          checked={reportReason === category.id}
+                          onChange={(e) => setReportReason(e.target.value)}
+                          className="mt-1 h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300"
+                        />
+                        <div className="flex-1">
+                          <div className="text-sm font-medium text-gray-900">{category.name}</div>
+                          <div className="text-xs text-gray-500">{category.description}</div>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+
+                  <div className="flex space-x-3">
+                    <button
+                      onClick={() => {
+                        console.log('🚨 Cancel button clicked');
+                        setShowReportModal(false);
+                        setSelectedPostForReport(null);
+                        setReportReason('');
+                      }}
+                      className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                    >
+                      Annuler
+                    </button>
+                    <button
+                      onClick={() => {
+                        console.log('🚨 Submit report button clicked');
+                        submitReport();
+                      }}
+                      disabled={!reportReason || isReporting}
+                      className={`flex-1 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                        !reportReason || isReporting
+                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                          : 'bg-red-600 text-white hover:bg-red-700'
+                      }`}
+                    >
+                      {isReporting ? (
+                        <div className="flex items-center justify-center space-x-2">
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                          <span>Envoi...</span>
+                        </div>
+                      ) : (
+                        'Signaler'
+                      )}
+                    </button>
                   </div>
                 </div>
               </div>

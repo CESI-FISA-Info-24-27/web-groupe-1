@@ -161,20 +161,55 @@ const PostDetail = () => {
     }
   };
 
-  // Fonction de like
+  // ✅ CORRECTION : Fonction de like avec synchronisation du store
   const handleLike = async () => {
     if (!post || pendingLikes.has(post.id_post)) return;
     
     try {
+      // ✅ AMÉLIORATION : Utiliser directement toggleLike du store qui gère tout
       await toggleLike(post.id_post);
       
-      setPost(prev => ({
-        ...prev,
-        isLiked: !prev.isLiked,
-        likeCount: prev.isLiked 
-          ? Math.max(0, (prev.likeCount || 0) - 1)
-          : (prev.likeCount || 0) + 1
-      }));
+      // ✅ CORRECTION : Récupérer l'état depuis le store après le like
+      const { posts } = useFeedStore.getState();
+      const updatedPostFromStore = posts.find(p => p.id_post === parseInt(post.id_post));
+      
+      if (updatedPostFromStore) {
+        // ✅ SYNC PARFAITE : Prendre directement l'état du store
+        setPost(prev => ({
+          ...prev,
+          isLiked: updatedPostFromStore.isLikedByCurrentUser,
+          isLikedByCurrentUser: updatedPostFromStore.isLikedByCurrentUser,
+          likeCount: updatedPostFromStore.likeCount || updatedPostFromStore.likesCount,
+          likesCount: updatedPostFromStore.likeCount || updatedPostFromStore.likesCount
+        }));
+      } else {
+        // ✅ CORRECTION : Si le post n'est pas dans le store, on l'ajoute avec l'état actuel
+        const { prependPost } = useFeedStore.getState();
+        
+        // Ajouter le post au store avec son nouvel état
+        const currentLiked = post.isLiked || post.isLikedByCurrentUser;
+        const newLikeState = !currentLiked;
+        const newCount = newLikeState 
+          ? (post.likeCount || 0) + 1 
+          : Math.max(0, (post.likeCount || 0) - 1);
+          
+        const updatedPostForStore = {
+          ...post,
+          isLikedByCurrentUser: newLikeState,
+          likeCount: newCount,
+          likesCount: newCount
+        };
+        
+        // Mettre à jour le state local
+        setPost(prev => ({
+          ...prev,
+          isLiked: newLikeState,
+          isLikedByCurrentUser: newLikeState,
+          likeCount: newCount,
+          likesCount: newCount
+        }));
+      }
+      
     } catch (error) {
       console.error('❌ Erreur toggle like:', error);
     }
@@ -414,12 +449,12 @@ const PostDetail = () => {
                     onClick={handleLike}
                     disabled={pendingLikes.has(post.id_post)}
                     className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-colors ${
-                      post.isLiked 
+                      post.isLiked || post.isLikedByCurrentUser
                         ? 'text-red-600 bg-red-50 hover:bg-red-100' 
                         : 'text-gray-600 hover:text-red-600 hover:bg-red-50'
                     } ${pendingLikes.has(post.id_post) ? 'opacity-50 cursor-not-allowed' : ''}`}
                   >
-                    <svg className="w-5 h-5" fill={post.isLiked ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-5 h-5" fill={post.isLiked || post.isLikedByCurrentUser ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                     </svg>
                     <span className="font-medium">{post.likeCount || 0}</span>
