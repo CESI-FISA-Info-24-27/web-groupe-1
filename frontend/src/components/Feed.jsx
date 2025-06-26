@@ -112,6 +112,57 @@ const Feed = () => {
     });
   };
 
+  // ✅ CORRECTION PRINCIPALE: Effect pour refresh des likes au retour sur la page
+  useEffect(() => {
+    // Fonction pour gérer la visibilité de la page
+    const handleVisibilityChange = () => {
+      if (!document.hidden && posts.length > 0) {
+        console.log('🔄 Page visible, refresh des données...');
+        // Forcer un refresh complet sans utiliser le cache localStorage
+        const { clearFeed, fetchPosts } = useFeedStore.getState();
+        clearFeed(); // Clear le store d'abord
+        setTimeout(() => {
+          fetchPosts(true); // Puis refetch depuis le serveur
+        }, 100);
+      }
+    };
+
+    // Fonction pour gérer le focus de la fenêtre
+    const handleFocus = () => {
+      if (posts.length > 0) {
+        console.log('🔄 Window focus, refresh des données...');
+        // Même logique pour le focus
+        const { clearFeed, fetchPosts } = useFeedStore.getState();
+        clearFeed();
+        setTimeout(() => {
+          fetchPosts(true);
+        }, 100);
+      }
+    };
+
+    // Écouter les changements de visibilité et focus
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [posts.length]);
+
+  // ✅ NOUVEAU: Effect pour forcer le refresh au montage du composant
+  useEffect(() => {
+    // Au montage, toujours refresh depuis le serveur pour avoir les likes à jour
+    if (user?.id_user) {
+      console.log('🔄 Component mounted, forcing fresh data...');
+      const { clearFeed, fetchPosts } = useFeedStore.getState();
+      clearFeed();
+      setTimeout(() => {
+        fetchPosts(true);
+      }, 100);
+    }
+  }, [user?.id_user]); // Seulement quand l'utilisateur change
+
   // Fermer l'emoji picker quand on clique ailleurs
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -244,14 +295,14 @@ const Feed = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // ✅ CHARGEMENT INITIAL - Utilise le store
+  // ✅ CHARGEMENT INITIAL - Remplacé par l'effect au-dessus
   useEffect(() => {
-    if (user?.id_user) {
+    // Effect pour les changements de filtre seulement
+    if (user?.id_user && posts.length > 0) {
+      console.log('🔄 Feed filter changed, fetching new data...');
       fetchPosts(true); // true = reset pagination
-    } else {
-      clearFeed();
     }
-  }, [feedFilter, user?.id_user, fetchPosts, clearFeed]);
+  }, [feedFilter]); // Seulement quand le filtre change
 
   // ✅ CORRECTION : Forcer la resynchronisation des posts depuis le store au chargement
   useEffect(() => {
@@ -1029,8 +1080,10 @@ const Feed = () => {
                                 <span>{post.likeCount || post.likesCount || 0}</span>
                                 {/* ✅ DEBUG : Afficher les propriétés pour diagnostiquer */}
                                 {process.env.NODE_ENV === 'development' && (
-                                  <span className="text-xs bg-gray-100 px-1 rounded">
-                                    {post.isLikedByCurrentUser ? 'LC' : ''}{post.isLiked ? 'L' : ''}{post.liked ? 'LD' : ''}
+                                  <span className="text-xs bg-yellow-100 px-2 py-1 rounded border">
+                                    LC:{post.isLikedByCurrentUser ? '1' : '0'} | 
+                                    L:{post.isLiked ? '1' : '0'} | 
+                                    LD:{post.liked ? '1' : '0'}
                                   </span>
                                 )}
                               </button>
