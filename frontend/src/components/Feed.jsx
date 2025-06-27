@@ -36,6 +36,7 @@ const Feed = () => {
   const [isPosting, setIsPosting] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [mobileMenuAnimating, setMobileMenuAnimating] = useState(false);
   
   // ✅ AMÉLIORATION : États pour le FAB et modal de post avec animation
   const [showFAB, setShowFAB] = useState(false);
@@ -198,6 +199,21 @@ const Feed = () => {
       setNewPost('');
       setShowEmojiPicker(false);
     }, 200);
+  };
+
+  // ✅ NOUVEAU : Fonctions d'animation pour le menu mobile
+  const openMobileMenu = () => {
+    setShowMobileMenu(true);
+    setMobileMenuAnimating(false);
+  };
+
+  const closeMobileMenu = () => {
+    setMobileMenuAnimating(true);
+    // Attendre la fin de l'animation avant de fermer
+    setTimeout(() => {
+      setShowMobileMenu(false);
+      setMobileMenuAnimating(false);
+    }, 300);
   };
 
   // ✅ RESTAURÉ : Fonction de recherche avec debouncing
@@ -684,8 +700,8 @@ const Feed = () => {
               {/* En-tête mobile */}
               <div className="lg:hidden flex items-center justify-between mb-6">
                 <button
-                  onClick={() => setShowMobileMenu(true)}
-                  className="p-2 rounded-lg bg-white shadow-sm border border-gray-200"
+                  onClick={openMobileMenu}
+                  className="p-2 rounded-lg bg-white shadow-sm border border-gray-200 hover:bg-gray-50 transition-colors duration-200"
                 >
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
@@ -1513,16 +1529,25 @@ const Feed = () => {
             </div>
           )}
 
-          {/* Menu mobile */}
+          {/* Menu mobile avec animations */}
           {showMobileMenu && (
-            <div className="lg:hidden fixed inset-0 z-50 bg-black bg-opacity-50" onClick={() => setShowMobileMenu(false)}>
-              <div className="bg-white w-64 h-full" onClick={(e) => e.stopPropagation()}>
+            <div 
+              className="lg:hidden fixed inset-0 z-50"
+              style={{ backgroundColor: 'rgba(0, 0, 0, 0.1)' }}
+              onClick={closeMobileMenu}
+            >
+              <div 
+                className={`bg-white w-64 h-full transform transition-all duration-300 ease-out ${
+                  mobileMenuAnimating ? 'animate-slide-out-left' : 'animate-slide-in-left'
+                }`}
+                onClick={(e) => e.stopPropagation()}
+              >
                 <div className="p-4 border-b border-gray-200">
                   <div className="flex items-center justify-between">
                     <h2 className="text-lg font-semibold">Menu</h2>
                     <button
-                      onClick={() => setShowMobileMenu(false)}
-                      className="p-2 rounded-lg hover:bg-gray-100"
+                      onClick={closeMobileMenu}
+                      className="p-2 rounded-lg hover:bg-gray-100 transition-colors duration-200"
                     >
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -1538,9 +1563,9 @@ const Feed = () => {
                     <button
                       onClick={() => {
                         setFeedFilter('recent');
-                        setShowMobileMenu(false);
+                        closeMobileMenu();
                       }}
-                      className={`w-full text-left px-3 py-2 rounded-lg text-sm ${
+                      className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors duration-200 ${
                         feedFilter === 'recent'
                           ? 'bg-black text-white'
                           : 'text-gray-700 hover:bg-gray-100'
@@ -1551,9 +1576,9 @@ const Feed = () => {
                     <button
                       onClick={() => {
                         setFeedFilter('friends');
-                        setShowMobileMenu(false);
+                        closeMobileMenu();
                       }}
-                      className={`w-full text-left px-3 py-2 rounded-lg text-sm ${
+                      className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors duration-200 ${
                         feedFilter === 'friends'
                           ? 'bg-black text-white'
                           : 'text-gray-700 hover:bg-gray-100'
@@ -1564,9 +1589,9 @@ const Feed = () => {
                     <button
                       onClick={() => {
                         setFeedFilter('popular');
-                        setShowMobileMenu(false);
+                        closeMobileMenu();
                       }}
-                      className={`w-full text-left px-3 py-2 rounded-lg text-sm ${
+                      className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors duration-200 ${
                         feedFilter === 'popular'
                           ? 'bg-black text-white'
                           : 'text-gray-700 hover:bg-gray-100'
@@ -1579,7 +1604,7 @@ const Feed = () => {
 
                 {/* Navigation mobile */}
                 <div className="p-4">
-                  <LeftSidebar isMobile={true} onClose={() => setShowMobileMenu(false)} />
+                  <LeftSidebar isMobile={true} onClose={closeMobileMenu} />
                 </div>
               </div>
             </div>
